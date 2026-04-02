@@ -28,7 +28,7 @@ lru = "0.13"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 parking_lot = "0.12"
-rand = "0.9"
+rand = "0.10"
 pdfium-render = { version = "0.8", features = ["thread_safe", "image"] }
 
 [profile.release]
