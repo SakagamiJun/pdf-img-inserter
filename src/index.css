@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: hsl(42 45% 98%);
+  --color-foreground: hsl(222 33% 14%);
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(222 33% 14%);
+  --color-popover: hsl(0 0% 100%);
+  --color-popover-foreground: hsl(222 33% 14%);
+  --color-primary: hsl(221 39% 20%);
+  --color-primary-foreground: hsl(48 100% 98%);
+  --color-secondary: hsl(210 40% 96%);
+  --color-secondary-foreground: hsl(221 39% 20%);
+  --color-muted: hsl(210 40% 96%);
+  --color-muted-foreground: hsl(217 16% 42%);
+  --color-accent: hsl(42 90% 93%);
+  --color-accent-foreground: hsl(221 39% 20%);
+  --color-destructive: hsl(0 72% 51%);
+  --color-destructive-foreground: hsl(0 0% 100%);
+  --color-border: hsl(214 28% 89%);
+  --color-input: hsl(214 28% 89%);
+  --color-ring: hsl(38 92% 50%);
+  --radius: 0.9rem;
+
+  --font-sans: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    min-height: 100%;
+  }
+
+  body {
+    background-attachment: fixed;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(148, 163, 184, 0.1);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.35);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(71, 85, 105, 0.55);
+  background-clip: padding-box;
+}

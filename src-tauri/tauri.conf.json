@@ -1,0 +1,56 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "PDF Image Inserter",
+  "version": "1.0.0",
+  "identifier": "com.pdfimginserter.desktop",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "PDF Image Inserter",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 1000,
+        "minHeight": 700,
+        "center": true,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' asset: https: data: preview: http://preview.localhost; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:* ws://localhost:*;",
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$APPCONFIG/**",
+          "$APPDATA/**",
+          "$APPCACHE/**",
+          "$APPLOG/**",
+          "$RESOURCE/**"
+        ]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "resources": {
+      "resources/pdfium": "pdfium"
+    },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "shortDescription": "Batch insert images into PDFs based on text search",
+    "longDescription": "A modern desktop application for batch inserting images into PDF files at locations determined by text search patterns.",
+    "category": "Utility"
+  },
+  "plugins": {}
+}

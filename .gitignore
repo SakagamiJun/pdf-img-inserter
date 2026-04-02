@@ -1,0 +1,50 @@
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Frontend build artifacts
+node_modules/
+dist/
+dist-ssr/
+coverage/
+.vite/
+.vite-temp/
+*.tsbuildinfo
+
+# Local env / machine-specific overrides
+*.local
+.env
+.env.*
+!.env.example
+
+# Rust / Tauri build artifacts
+src-tauri/target/
+src-tauri/gen/
+
+# Local runtime data
+/config.toml
+/config.toml.broken-*.bak
+/input_pdfs/
+/output_pdfs/
+/src-tauri/config.toml
+/src-tauri/input_pdfs/
+/src-tauri/output_pdfs/
+/src-tauri/vendor/pdfium/
+
+# Editor directories and OS files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.orig
