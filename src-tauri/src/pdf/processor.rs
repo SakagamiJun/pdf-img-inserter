@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use anyhow::Context;
 use image::ImageFormat;
 use pdfium_render::prelude::*;
-use rand::Rng;
+use rand::RngExt;
 use serde::Serialize;
 use tracing::{debug, info, warn};
 
