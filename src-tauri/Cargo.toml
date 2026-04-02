@@ -24,7 +24,7 @@ anyhow = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "sync"] }
 rayon = "1"
 image = "0.25"
-lru = "0.13"
+lru = "0.16"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 parking_lot = "0.12"
