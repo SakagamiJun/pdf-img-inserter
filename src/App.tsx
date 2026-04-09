@@ -20,11 +20,13 @@ import type { LogEntry, TaskConfig } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type SidebarTab = "tasks" | "config";
+const AUTO_SAVE_DELAY_MS = 350;
 
 function App() {
   const {
     config,
     configPath,
+    mutationVersion,
     loadConfig,
     saveConfig,
     initDefaultConfig,
@@ -80,6 +82,16 @@ function App() {
 
   const handleLoadConfig = useCallback(
     async (path: string) => {
+      if (config && configPath && mutationVersion > 0) {
+        try {
+          await saveConfig(configPath, config, { mutationVersion });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          addLog("error", `切换配置文件前自动保存失败: ${message}`, { target: "config" });
+          return;
+        }
+      }
+
       const loaded = await loadConfig(path);
       if (loaded) {
         addLog("info", `已加载配置文件: ${path}`);
@@ -90,21 +102,21 @@ function App() {
         setSelectedTaskId(nextSelectedTask);
       }
     },
-    [addLog, loadConfig, selectedTaskId]
+    [addLog, config, configPath, loadConfig, mutationVersion, saveConfig, selectedTaskId]
   );
 
   const handleSaveConfig = useCallback(async () => {
     if (!config || !configPath) return;
 
     try {
-      await saveConfig(configPath, config);
+      await saveConfig(configPath, config, { mutationVersion });
       addLog("info", `已保存配置文件: ${configPath}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       addLog("error", `保存配置失败: ${message}`, { target: "config" });
       throw err;
     }
-  }, [addLog, config, configPath, saveConfig]);
+  }, [addLog, config, configPath, mutationVersion, saveConfig]);
 
   const handleProcess = useCallback(async () => {
     if (!config || processing) return;
@@ -225,6 +237,21 @@ function App() {
       }
     });
   }, [initDefaultConfig]);
+
+  useEffect(() => {
+    if (!config || !configPath || mutationVersion === 0) return;
+
+    const timeoutId = window.setTimeout(() => {
+      saveConfig(configPath, config, { mutationVersion }).catch((err) => {
+        const message = err instanceof Error ? err.message : String(err);
+        addLog("error", `自动保存配置失败: ${message}`, { target: "config" });
+      });
+    }, AUTO_SAVE_DELAY_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [addLog, config, configPath, mutationVersion, saveConfig]);
 
   const enabledTaskCount = config?.tasks.filter((task) => task.enabled).length ?? 0;
   const previewFileName = previewPdf?.split(/[\\/]/).pop() ?? null;
