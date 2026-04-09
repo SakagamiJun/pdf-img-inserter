@@ -8,7 +8,17 @@ export interface SwitchProps
 }
 
 const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
-  ({ className, checked = false, onCheckedChange, ...props }, ref) => {
+  ({ className, checked = false, onCheckedChange, onClick, ...props }, ref) => {
+    const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+      onClick?.(event);
+
+      if (event.defaultPrevented) {
+        return;
+      }
+
+      onCheckedChange?.(!checked);
+    };
+
     return (
       <button
         type="button"
@@ -20,7 +30,7 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
           checked ? "bg-primary" : "bg-input/90",
           className
         )}
-        onClick={() => onCheckedChange?.(!checked)}
+        onClick={handleClick}
         {...props}
       >
         <span

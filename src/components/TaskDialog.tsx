@@ -123,9 +123,6 @@ export function TaskDialog({
             <h2 className="mt-2 text-lg font-semibold text-foreground">
               {task ? `编辑 ${task.name}` : "添加新任务"}
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              参数保持聚焦，只编辑会影响插图位置和预览的核心字段。
-            </p>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} className="rounded-xl">
             <X className="h-4 w-4" />

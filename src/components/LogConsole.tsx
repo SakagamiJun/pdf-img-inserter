@@ -1,6 +1,7 @@
 import { Copy, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
 import type { LogEntry } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -50,32 +51,27 @@ export function LogConsole({ logs, onClear }: LogConsoleProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-start justify-between gap-3 border-b hairline pb-4">
-        <div>
+      <div className="flex items-center justify-between gap-3 border-b hairline pb-4">
+        <div className="min-w-0">
           <div className="text-xs font-medium text-foreground">运行日志</div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            默认只是一条安静的信息流。错误会保留下来，但不会把整个工作台染成告警色。
-          </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
+          <Button
             onClick={handleCopy}
             disabled={logs.length === 0}
-            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border bg-background/80 px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            className="h-9 min-w-[88px] rounded-xl px-3 text-xs whitespace-nowrap"
           >
             <Copy className="h-3.5 w-3.5" />
             {copied ? "已复制" : "复制"}
-          </button>
+          </Button>
           {onClear ? (
-            <button
-              type="button"
+            <Button
               onClick={onClear}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border bg-background/80 px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              className="h-9 min-w-[88px] rounded-xl px-3 text-xs whitespace-nowrap"
             >
               <Trash2 className="h-3.5 w-3.5" />
               清空
-            </button>
+            </Button>
           ) : null}
         </div>
       </div>

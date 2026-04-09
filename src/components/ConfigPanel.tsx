@@ -68,14 +68,11 @@ export function ConfigPanel({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-start justify-between gap-3 border-b hairline pb-4">
-        <div>
+      <div className="flex items-center justify-between gap-3 border-b hairline pb-4">
+        <div className="min-w-0">
           <div className="text-xs font-medium text-foreground">路径与配置</div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            这里保持极简，只放当前工作配置和输入输出路径。
-          </p>
         </div>
-        <div className="rounded-full border border-border bg-background/80 px-2.5 py-1 text-[11px] text-muted-foreground">
+        <div className="inline-flex h-9 min-w-[112px] shrink-0 items-center justify-center whitespace-nowrap rounded-xl border border-transparent bg-primary px-3 text-xs font-medium text-primary-foreground shadow-[var(--app-shadow-soft)]">
           {dirty ? "未保存更改" : "已同步"}
         </div>
       </div>

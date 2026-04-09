@@ -284,12 +284,12 @@ function App() {
 
   return (
     <div
-      className="app-shell h-screen overflow-hidden p-3"
+      className="app-shell h-screen overflow-hidden"
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
-      <div className="panel-surface-strong relative flex h-full w-full overflow-hidden rounded-[28px]">
+      <div className="panel-surface-strong relative flex h-full w-full overflow-hidden rounded-none border-0">
         <aside className="flex h-full w-[72px] shrink-0 flex-col items-center justify-between border-r hairline bg-[var(--app-sidebar)] px-3 py-4">
           <div className="flex flex-col items-center gap-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-foreground text-background text-sm font-semibold">
@@ -505,7 +505,7 @@ function WorkspacePanel({
 }: WorkspacePanelProps) {
   if (activeSection === "tasks") {
     return (
-      <div className="flex h-full min-h-0 flex-col px-5 py-5">
+      <div className="flex h-full min-h-0 flex-col px-4 py-4">
         <div className="border-b hairline pb-4">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -558,7 +558,7 @@ function WorkspacePanel({
 
   if (activeSection === "config") {
     return (
-      <div className="h-full px-5 py-5">
+      <div className="h-full px-4 py-4">
         <ConfigPanel
           configPath={configPath}
           inputFolder={config?.global.inputFolder ?? ""}
@@ -574,7 +574,7 @@ function WorkspacePanel({
   }
 
   return (
-    <div className="h-full px-5 py-5">
+    <div className="h-full px-4 py-4">
       <LogConsole logs={logs} onClear={onClearLogs} />
     </div>
   );

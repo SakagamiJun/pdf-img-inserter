@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Eye, EyeOff, GripVertical, Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import type { TaskConfig } from "@/lib/types";
@@ -47,7 +47,7 @@ export function TaskList({
   };
 
   return (
-    <div className="min-h-0 overflow-auto pr-1">
+    <div className="min-h-0 overflow-auto">
       <div className="space-y-1.5">
         {tasks.map((task, index) => (
           <div
@@ -82,61 +82,51 @@ export function TaskList({
                 setDropIndex(null);
               }}
               className={cn(
-                "group panel-surface-muted flex min-h-12 cursor-pointer items-center gap-3 rounded-2xl px-3 py-2.5 transition-[background,border-color,box-shadow,transform] duration-150",
+                "group panel-surface-muted flex min-h-[92px] cursor-pointer items-stretch gap-3 rounded-2xl px-3 py-3 transition-[background,border-color,box-shadow,transform] duration-150",
                 selectedTaskId === task.name &&
                   "border-[color:var(--app-border-strong)] bg-[var(--app-surface-strong)] shadow-[var(--app-shadow-soft)]",
                 draggingTaskId === task.name && "opacity-55",
                 !task.enabled && "opacity-65"
               )}
             >
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <button
-                  type="button"
-                  aria-label={`拖拽排序 ${task.name}`}
-                  className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  <GripVertical className="h-4 w-4 cursor-grab" />
-                </button>
-                <span className="w-6 text-center font-mono text-[11px]">{index + 1}</span>
-              </div>
-
-              <Switch
-                checked={task.enabled}
-                onClick={(event) => event.stopPropagation()}
-                onCheckedChange={() => onToggle(task.name)}
-              />
-
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-border bg-background/80 px-1.5 font-mono text-[11px] text-muted-foreground">
+                    {index + 1}
+                  </span>
                   <span className="truncate text-sm font-medium text-foreground">{task.name}</span>
-                  {task.enabled ? (
-                    <Eye className="h-3.5 w-3.5 text-muted-foreground" />
-                  ) : (
-                    <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
-                  )}
+                  {!task.enabled ? (
+                    <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                      已停用
+                    </span>
+                  ) : null}
                 </div>
-                <div className="mt-1 truncate text-xs text-muted-foreground">
-                  搜索词: {task.searchText}
+
+                <div className="mt-2 text-xs leading-5 text-muted-foreground break-all">
+                  <span className="mr-2 text-[11px] uppercase tracking-[0.14em]">Search</span>
+                  {task.searchText}
                 </div>
-                <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <TaskMetaChip>高度 {task.targetHeightPoints}pt</TaskMetaChip>
-                  <TaskMetaChip>
-                    偏移 {task.baseOffsetX}/{task.baseOffsetY}
-                  </TaskMetaChip>
-                  {(task.randomOffsetX > 0 || task.randomOffsetY > 0) && (
-                    <TaskMetaChip>
-                      随机 ±{task.randomOffsetX}/±{task.randomOffsetY}
-                    </TaskMetaChip>
-                  )}
+
+                <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+                  <TaskMetaChip label="高度" value={`${task.targetHeightPoints}pt`} />
+                  <TaskMetaChip label="基础偏移" value={`${task.baseOffsetX} / ${task.baseOffsetY}`} />
+                  <TaskMetaChip label="随机偏移 X" value={`±${task.randomOffsetX}`} />
+                  <TaskMetaChip label="随机偏移 Y" value={`±${task.randomOffsetY}`} />
                 </div>
               </div>
 
-              <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+              <div className="flex w-10 shrink-0 flex-col items-center justify-between gap-1">
+                <Switch
+                  checked={task.enabled}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                  }}
+                  onCheckedChange={() => onToggle(task.name)}
+                />
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 rounded-xl"
+                  className="h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground"
                   onClick={(event) => {
                     event.stopPropagation();
                     onEdit(task);
@@ -191,10 +181,17 @@ function DropPlaceholder() {
   );
 }
 
-function TaskMetaChip({ children }: { children: ReactNode }) {
+function TaskMetaChip({
+  label,
+  value,
+}: {
+  label: string;
+  value: ReactNode;
+}) {
   return (
-    <span className="rounded-full border border-border bg-background/80 px-2 py-0.5">
-      {children}
-    </span>
+    <div className="rounded-xl border border-border bg-background/72 px-2.5 py-1.5">
+      <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
+      <div className="mt-0.5 text-[11px] text-foreground">{value}</div>
+    </div>
   );
 }
