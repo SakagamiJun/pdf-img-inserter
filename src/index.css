@@ -1,29 +1,97 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: hsl(42 45% 98%);
-  --color-foreground: hsl(222 33% 14%);
-  --color-card: hsl(0 0% 100%);
-  --color-card-foreground: hsl(222 33% 14%);
-  --color-popover: hsl(0 0% 100%);
-  --color-popover-foreground: hsl(222 33% 14%);
-  --color-primary: hsl(221 39% 20%);
-  --color-primary-foreground: hsl(48 100% 98%);
-  --color-secondary: hsl(210 40% 96%);
-  --color-secondary-foreground: hsl(221 39% 20%);
-  --color-muted: hsl(210 40% 96%);
-  --color-muted-foreground: hsl(217 16% 42%);
-  --color-accent: hsl(42 90% 93%);
-  --color-accent-foreground: hsl(221 39% 20%);
-  --color-destructive: hsl(0 72% 51%);
-  --color-destructive-foreground: hsl(0 0% 100%);
-  --color-border: hsl(214 28% 89%);
-  --color-input: hsl(214 28% 89%);
-  --color-ring: hsl(38 92% 50%);
-  --radius: 0.9rem;
+  --color-background: var(--app-background);
+  --color-foreground: var(--app-foreground);
+  --color-card: var(--app-card);
+  --color-card-foreground: var(--app-card-foreground);
+  --color-popover: var(--app-popover);
+  --color-popover-foreground: var(--app-popover-foreground);
+  --color-primary: var(--app-primary);
+  --color-primary-foreground: var(--app-primary-foreground);
+  --color-secondary: var(--app-secondary);
+  --color-secondary-foreground: var(--app-secondary-foreground);
+  --color-muted: var(--app-muted);
+  --color-muted-foreground: var(--app-muted-foreground);
+  --color-accent: var(--app-accent);
+  --color-accent-foreground: var(--app-accent-foreground);
+  --color-destructive: var(--app-destructive);
+  --color-destructive-foreground: var(--app-destructive-foreground);
+  --color-border: var(--app-border);
+  --color-input: var(--app-input);
+  --color-ring: var(--app-ring);
+  --radius: 0.875rem;
 
   --font-sans: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+}
+
+:root {
+  color-scheme: light;
+  --app-background: hsl(220 23% 97%);
+  --app-foreground: hsl(220 24% 14%);
+  --app-card: hsl(0 0% 100%);
+  --app-card-foreground: hsl(220 24% 14%);
+  --app-popover: hsl(0 0% 100%);
+  --app-popover-foreground: hsl(220 24% 14%);
+  --app-primary: hsl(220 30% 17%);
+  --app-primary-foreground: hsl(210 40% 98%);
+  --app-secondary: hsl(220 18% 95%);
+  --app-secondary-foreground: hsl(220 24% 14%);
+  --app-muted: hsl(220 16% 94%);
+  --app-muted-foreground: hsl(220 10% 43%);
+  --app-accent: hsl(220 20% 92%);
+  --app-accent-foreground: hsl(220 24% 14%);
+  --app-destructive: hsl(0 72% 52%);
+  --app-destructive-foreground: hsl(0 0% 100%);
+  --app-border: hsl(220 17% 87%);
+  --app-input: hsl(220 17% 87%);
+  --app-ring: hsl(220 30% 17%);
+  --app-surface: hsl(0 0% 100% / 0.86);
+  --app-surface-strong: hsl(0 0% 100%);
+  --app-surface-muted: hsl(220 20% 96% / 0.96);
+  --app-sidebar: hsl(220 22% 95% / 0.92);
+  --app-border-strong: hsl(220 17% 80%);
+  --app-shadow: 0 18px 48px rgba(15, 23, 42, 0.08);
+  --app-shadow-soft: 0 8px 24px rgba(15, 23, 42, 0.05);
+  --app-success: hsl(156 65% 36%);
+  --app-warning: hsl(38 92% 44%);
+  --app-info: hsl(214 84% 45%);
+  --app-overlay: rgba(15, 23, 42, 0.12);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --app-background: hsl(220 18% 9%);
+  --app-foreground: hsl(210 20% 92%);
+  --app-card: hsl(220 17% 12%);
+  --app-card-foreground: hsl(210 20% 92%);
+  --app-popover: hsl(220 17% 12%);
+  --app-popover-foreground: hsl(210 20% 92%);
+  --app-primary: hsl(210 24% 92%);
+  --app-primary-foreground: hsl(220 22% 10%);
+  --app-secondary: hsl(220 16% 16%);
+  --app-secondary-foreground: hsl(210 20% 92%);
+  --app-muted: hsl(220 15% 15%);
+  --app-muted-foreground: hsl(220 10% 64%);
+  --app-accent: hsl(220 15% 18%);
+  --app-accent-foreground: hsl(210 20% 92%);
+  --app-destructive: hsl(0 78% 58%);
+  --app-destructive-foreground: hsl(0 0% 100%);
+  --app-border: hsl(220 13% 22%);
+  --app-input: hsl(220 13% 22%);
+  --app-ring: hsl(210 20% 92%);
+  --app-surface: hsl(220 17% 12% / 0.92);
+  --app-surface-strong: hsl(220 17% 14%);
+  --app-surface-muted: hsl(220 15% 14% / 0.96);
+  --app-sidebar: hsl(220 18% 11% / 0.96);
+  --app-border-strong: hsl(220 12% 30%);
+  --app-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+  --app-shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.2);
+  --app-success: hsl(156 58% 48%);
+  --app-warning: hsl(39 95% 56%);
+  --app-info: hsl(213 90% 63%);
+  --app-overlay: rgba(2, 6, 23, 0.55);
 }
 
 @layer base {
@@ -32,13 +100,69 @@
   }
 
   html,
-  body {
-    @apply bg-background text-foreground font-sans antialiased;
+  body,
+  #root {
     min-height: 100%;
+    height: 100%;
+    margin: 0;
+  }
+
+  html {
+    background: var(--app-background);
   }
 
   body {
-    background-attachment: fixed;
+    @apply bg-background text-foreground font-sans antialiased;
+    background-image:
+      radial-gradient(circle at top left, rgba(255, 255, 255, 0.55), transparent 28%),
+      linear-gradient(180deg, transparent, rgba(15, 23, 42, 0.015));
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--app-primary) 18%, transparent);
+  }
+}
+
+@layer components {
+  .app-shell {
+    background:
+      radial-gradient(circle at top left, rgba(255, 255, 255, 0.34), transparent 24%),
+      var(--app-background);
+  }
+
+  .panel-surface {
+    background: var(--app-surface);
+    border: 1px solid var(--app-border);
+    box-shadow: var(--app-shadow-soft);
+    backdrop-filter: blur(16px);
+  }
+
+  .panel-surface-strong {
+    background: var(--app-surface-strong);
+    border: 1px solid var(--app-border);
+    box-shadow: var(--app-shadow);
+  }
+
+  .panel-surface-muted {
+    background: var(--app-surface-muted);
+    border: 1px solid var(--app-border);
+  }
+
+  .hairline {
+    border-color: color-mix(in srgb, var(--app-border) 88%, transparent);
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
   }
 }
 
@@ -48,17 +172,17 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(148, 163, 184, 0.1);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.35);
+  background: color-mix(in srgb, var(--app-muted-foreground) 34%, transparent);
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(71, 85, 105, 0.55);
+  background: color-mix(in srgb, var(--app-muted-foreground) 52%, transparent);
   background-clip: padding-box;
 }

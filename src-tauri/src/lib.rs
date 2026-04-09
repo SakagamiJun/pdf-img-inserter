@@ -1,3 +1,4 @@
+pub mod batch;
 pub mod config;
 pub mod coord;
 pub mod error;
@@ -8,11 +9,11 @@ pub mod pdf;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
+use std::sync::mpsc;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use parking_lot::RwLock;
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager};
 use tauri_plugin_dialog::DialogExt;
@@ -24,8 +25,8 @@ use crate::error::AppError;
 use crate::image::{preview_url, ImageCache, PreviewStore};
 use crate::logging::{init_tracing, LogBridge};
 use crate::pdf::{
-    find_pdf_files, get_page_count, get_text_positions, process_pdf_file, render_page_preview,
-    PreviewOverlay, ProgressEvent,
+    find_pdf_files, get_page_count, get_text_positions, render_page_preview, PreviewOverlay,
+    ProgressEvent,
 };
 
 const USER_DOCUMENT_SUBDIR: &str = "PDFImgInserter";
@@ -393,7 +394,19 @@ struct DialogFilter {
     extensions: Vec<String>,
 }
 
-fn validate_runtime_task_fields(task: &TaskConfig) -> crate::error::Result<()> {
+#[derive(Debug)]
+enum BatchWorkerEvent {
+    Started {
+        filename: String,
+        index: usize,
+    },
+    Finished {
+        filename: String,
+        result: Result<batch::BatchWorkerResponse, String>,
+    },
+}
+
+pub(crate) fn validate_runtime_task_fields(task: &TaskConfig) -> crate::error::Result<()> {
     if task.name.trim().is_empty() {
         return Err(AppError::Config("任务名称不能为空".into()));
     }
@@ -457,7 +470,7 @@ fn apply_dialog_filters<R: tauri::Runtime>(
     dialog
 }
 
-fn ensure_distinct_output(
+pub(crate) fn ensure_distinct_output(
     input: &std::path::Path,
     output: &std::path::Path,
 ) -> crate::error::Result<()> {
@@ -766,78 +779,126 @@ async fn process_files(
             "开始批量处理 PDF"
         );
 
+        let executable_path = std::env::current_exe().map_err(|error| error.to_string())?;
+        let worker_count = batch::current_worker_count(total);
         let success_count = AtomicU32::new(0);
         let failed_count = AtomicU32::new(0);
         let completed_count = AtomicUsize::new(0);
+        let next_index = AtomicUsize::new(0);
+        let tasks = Arc::new(tasks);
+        let pdf_files = Arc::new(pdf_files);
+        let output_path = Arc::new(output_path);
+        let pdfium_resource_dir = state.pdfium_resource_dir();
+        let (tx, rx) = mpsc::channel::<BatchWorkerEvent>();
 
-        pdf_files
-            .par_iter()
-            .enumerate()
-            .for_each(|(index, input_file)| {
-                let filename = input_file
-                    .file_name()
-                    .map(|name| name.to_string_lossy().to_string())
-                    .unwrap_or_else(|| format!("file-{}", index + 1));
-                let output_file = output_path.join(
-                    input_file
+        let _ = app.emit(
+            "log",
+            logging::LogEvent {
+                timestamp_ms: SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as u64,
+                level: "INFO".to_string(),
+                target: "batch".to_string(),
+                message: format!("已启用 {worker_count} 个批处理子进程"),
+                fields: Default::default(),
+            },
+        );
+
+        std::thread::scope(|scope| {
+            for _ in 0..worker_count {
+                let tx = tx.clone();
+                let executable_path = executable_path.clone();
+                let tasks = Arc::clone(&tasks);
+                let pdf_files = Arc::clone(&pdf_files);
+                let output_path = Arc::clone(&output_path);
+                let pdfium_resource_dir = pdfium_resource_dir.clone();
+                let next_index = &next_index;
+
+                scope.spawn(move || loop {
+                    let index = next_index.fetch_add(1, Ordering::Relaxed);
+                    if index >= pdf_files.len() {
+                        break;
+                    }
+
+                    let input_file = pdf_files[index].clone();
+                    let filename = input_file
                         .file_name()
-                        .map(PathBuf::from)
-                        .unwrap_or_else(|| PathBuf::from(&filename)),
-                );
+                        .map(|name| name.to_string_lossy().to_string())
+                        .unwrap_or_else(|| format!("file-{}", index + 1));
+                    let output_file = output_path.join(
+                        input_file
+                            .file_name()
+                            .map(PathBuf::from)
+                            .unwrap_or_else(|| PathBuf::from(&filename)),
+                    );
 
-                let _ = app.emit(
-                    "progress",
-                    ProgressEvent::FileStarted {
+                    let _ = tx.send(BatchWorkerEvent::Started {
                         filename: filename.clone(),
                         index,
-                        total,
-                    },
-                );
+                    });
 
-                let result = state.create_pdfium().and_then(|pdfium| {
-                    process_pdf_file(
-                        &pdfium,
-                        input_file,
+                    let result = batch::run_worker_process(
+                        &executable_path,
+                        &input_file,
                         &output_file,
-                        &tasks,
-                        &state.image_cache,
+                        tasks.as_slice(),
+                        pdfium_resource_dir.as_deref(),
                     )
+                    .map_err(|error| error.to_string());
+
+                    let _ = tx.send(BatchWorkerEvent::Finished { filename, result });
                 });
+            }
 
-                let completed = completed_count.fetch_add(1, Ordering::Relaxed) + 1;
+            drop(tx);
 
-                match result {
-                    Ok(processed) => {
-                        success_count.fetch_add(1, Ordering::Relaxed);
+            for event in rx {
+                match event {
+                    BatchWorkerEvent::Started { filename, index } => {
                         let _ = app.emit(
                             "progress",
-                            ProgressEvent::FileCompleted {
+                            ProgressEvent::FileStarted {
                                 filename,
-                                insertions: processed.insertions,
-                                completed,
+                                index,
                                 total,
                             },
                         );
                     }
-                    Err(process_error) => {
-                        failed_count.fetch_add(1, Ordering::Relaxed);
-                        error!(
-                            file = %input_file.display(),
-                            error = %process_error,
-                            "PDF 处理失败"
-                        );
-                        let _ = app.emit(
-                            "progress",
-                            ProgressEvent::FileError {
-                                filename,
-                                error: process_error.to_string(),
-                                completed,
-                                total,
-                            },
-                        );
+                    BatchWorkerEvent::Finished { filename, result } => {
+                        let completed = completed_count.fetch_add(1, Ordering::Relaxed) + 1;
+
+                        match result {
+                            Ok(processed) => {
+                                success_count.fetch_add(1, Ordering::Relaxed);
+                                let _ = app.emit(
+                                    "progress",
+                                    ProgressEvent::FileCompleted {
+                                        filename,
+                                        insertions: processed.insertions,
+                                        completed,
+                                        total,
+                                    },
+                                );
+                            }
+                            Err(process_error) => {
+                                failed_count.fetch_add(1, Ordering::Relaxed);
+                                error!(error = %process_error, file = %filename, "PDF 处理失败");
+                                let _ = app.emit(
+                                    "progress",
+                                    ProgressEvent::FileError {
+                                        filename,
+                                        error: process_error,
+                                        completed,
+                                        total,
+                                    },
+                                );
+                            }
+                        }
                     }
                 }
-            });
+            }
+        });
 
         let _ = app.emit(
             "progress",
