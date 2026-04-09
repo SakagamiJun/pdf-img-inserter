@@ -71,7 +71,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build Tauri app without bundles
-        run: pnpm tauri build -- --no-bundle
+        run: pnpm tauri build --no-bundle
 
   release:
     name: Build Bundle (${{ matrix.os }})
