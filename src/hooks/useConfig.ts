@@ -134,20 +134,26 @@ export function useConfig() {
     setMutationVersion((prev) => prev + 1);
   }, []);
 
-  const reorderTasks = useCallback((sourceTaskId: string, targetTaskId: string) => {
+  const reorderTasks = useCallback((sourceTaskId: string, targetIndex: number) => {
     setConfig((prev) => {
-      if (!prev || sourceTaskId === targetTaskId) return prev;
+      if (!prev) return prev;
 
       const sourceIndex = prev.tasks.findIndex((task) => task.name === sourceTaskId);
-      const targetIndex = prev.tasks.findIndex((task) => task.name === targetTaskId);
 
-      if (sourceIndex === -1 || targetIndex === -1) {
+      if (sourceIndex === -1) {
         return prev;
       }
 
       const nextTasks = [...prev.tasks];
       const [moved] = nextTasks.splice(sourceIndex, 1);
-      nextTasks.splice(targetIndex, 0, moved);
+      const clampedIndex = Math.max(0, Math.min(targetIndex, nextTasks.length));
+      const insertionIndex = sourceIndex < clampedIndex ? clampedIndex - 1 : clampedIndex;
+
+      if (insertionIndex === sourceIndex) {
+        return prev;
+      }
+
+      nextTasks.splice(insertionIndex, 0, moved);
 
       return {
         ...prev,

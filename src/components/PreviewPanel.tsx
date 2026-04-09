@@ -13,6 +13,9 @@ interface PreviewPanelProps {
   pageCount: number;
   tasks: TaskConfig[];
   selectedTaskId: string | null;
+  processing?: boolean;
+  progress?: { current: number; total: number };
+  toolbarActions?: ReactNode;
   onPageChange: (page: number) => void;
 }
 
@@ -22,6 +25,9 @@ export function PreviewPanel({
   pageCount,
   tasks,
   selectedTaskId,
+  processing = false,
+  progress = { current: 0, total: 0 },
+  toolbarActions,
   onPageChange,
 }: PreviewPanelProps) {
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
@@ -56,13 +62,12 @@ export function PreviewPanel({
 
       try {
         const response = await renderPreview(pdfPath, page, enabledTasks, selectedTaskId);
-
         if (!disposed) {
           setPreview(response);
         }
-      } catch (err) {
+      } catch (loadError) {
         if (!disposed) {
-          setError(err instanceof Error ? err.message : String(err));
+          setError(loadError instanceof Error ? loadError.message : String(loadError));
           setPreview(null);
         }
       } finally {
@@ -95,63 +100,123 @@ export function PreviewPanel({
   const showGuides = mode !== "effect";
   const previewUsesRandomOffset = overlays.some((overlay) => overlay.randomized);
 
+  let content: ReactNode;
+
   if (!pdfPath) {
-    return (
+    content = (
       <EmptyState
         title="还没有预览 PDF"
-        description="选择一个 PDF 后，右侧会以接近最终输出的方式叠加所有启用任务。"
+        description="从主工具栏选择一个 PDF 后，右侧会以接近最终输出的方式展示图片叠加效果。"
       />
     );
-  }
-
-  if (enabledTasks.length === 0) {
-    return (
+  } else if (enabledTasks.length === 0) {
+    content = (
       <EmptyState
-        title="没有可预览的任务"
+        title="没有启用的任务"
         description="启用至少一个任务后，这里会直接显示图片叠加效果与落点辅助线。"
+      />
+    );
+  } else if (loading) {
+    content = (
+      <div className="flex h-full min-h-[340px] items-center justify-center">
+        <div className="panel-surface-muted flex items-center gap-3 rounded-full px-4 py-2 text-sm text-muted-foreground">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-foreground" />
+          后端正在渲染预览...
+        </div>
+      </div>
+    );
+  } else if (error) {
+    content = (
+      <div className="flex h-full min-h-[340px] items-center justify-center">
+        <div className="panel-surface-muted max-w-md rounded-3xl px-5 py-4 text-center">
+          <div className="text-base font-medium text-foreground">预览失败</div>
+          <div className="mt-2 text-sm text-muted-foreground">{error}</div>
+        </div>
+      </div>
+    );
+  } else if (preview) {
+    content = (
+      <div className="flex min-h-full items-start justify-center">
+        <div className="panel-surface-strong relative inline-block overflow-hidden rounded-[24px] p-3">
+          <img
+            src={imageSrc ?? preview.imageUrl}
+            alt="PDF preview"
+            className="block max-h-[82vh] max-w-full rounded-[18px]"
+            onError={() => setImageSrc(null)}
+          />
+
+          <div className="pointer-events-none absolute inset-3">
+            {showGuides ? (
+              <svg className="absolute inset-0 h-full w-full overflow-visible">
+                {overlays.map((overlay, index) => (
+                  <ConnectorOverlay key={`${overlay.taskName}-connector-${index}`} overlay={overlay} />
+                ))}
+              </svg>
+            ) : null}
+
+            {overlays.map((overlay, index) => (
+              <ImageOverlay
+                key={`${overlay.taskName}-${index}`}
+                overlay={overlay}
+                src={overlay.imageUrl}
+                showGuides={showGuides}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  } else {
+    content = (
+      <EmptyState
+        title="预览准备中"
+        description="当前状态还没有可显示的切片，请稍后再试。"
       />
     );
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/70 bg-white/70 px-4 py-3 backdrop-blur">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b hairline px-5 py-4">
         <div className="min-w-0">
-          <div className="text-[11px] uppercase tracking-[0.24em] text-slate-400">
-            Rendered Preview
+          <div className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
+            Preview Workspace
           </div>
-          <div className="mt-1 flex items-center gap-2 text-sm font-medium text-slate-800">
-            <Layers3 className="h-4 w-4 text-slate-500" />
-            <span className="truncate">{previewFileName}</span>
-            <span className="text-slate-400">·</span>
-            <span className="shrink-0">
-              第 {page + 1} / {Math.max(pageCount, 1)} 页
-            </span>
+          <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2 text-sm text-foreground">
+            <Layers3 className="h-4 w-4 text-muted-foreground" />
+            <span className="max-w-[340px] truncate font-medium">{previewFileName}</span>
+            <StatusPill>{enabledTasks.length} 个启用任务</StatusPill>
+            <StatusPill>第 {page + 1} / {Math.max(pageCount, 1)} 页</StatusPill>
+            {progress.total > 0 ? (
+              <StatusPill>
+                {processing ? "处理中" : "最近批处理"} {progress.current}/{progress.total}
+              </StatusPill>
+            ) : null}
+            {selectedTaskId ? <StatusPill>当前任务 {selectedTaskId}</StatusPill> : null}
+            {previewUsesRandomOffset ? <StatusPill>含随机偏移</StatusPill> : null}
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <SegmentedControl
             value={mode}
             onChange={setMode}
             options={[
               { value: "all", label: "全部叠加" },
-              { value: "focused", label: "仅当前任务" },
+              { value: "focused", label: "当前任务" },
               { value: "effect", label: "纯效果" },
             ]}
           />
-
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={() => onPageChange(Math.max(0, page - 1))}
               disabled={page <= 0 || loading}
-              className="rounded-full"
+              className="h-9 rounded-xl px-3"
             >
-              <ChevronLeft className="mr-1 h-3.5 w-3.5" />
-              上一页
+              <ChevronLeft className="h-4 w-4" />
             </Button>
             <Button
               type="button"
@@ -159,76 +224,16 @@ export function PreviewPanel({
               size="sm"
               onClick={() => onPageChange(Math.min(pageCount - 1, page + 1))}
               disabled={pageCount <= 1 || page >= pageCount - 1 || loading}
-              className="rounded-full"
+              className="h-9 rounded-xl px-3"
             >
-              下一页
-              <ChevronRight className="ml-1 h-3.5 w-3.5" />
+              <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
+          {toolbarActions}
         </div>
       </div>
 
-      <div className="relative flex-1 overflow-auto bg-[radial-gradient(circle_at_top,_rgba(248,250,252,0.86),_rgba(226,232,240,0.55))] p-4">
-        {loading && (
-          <div className="flex h-full min-h-[320px] items-center justify-center">
-            <div className="flex items-center gap-3 rounded-full border border-slate-200 bg-white/90 px-4 py-2 text-sm text-slate-600 shadow-sm">
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
-              后端正在渲染切片...
-            </div>
-          </div>
-        )}
-
-        {!loading && error && (
-          <div className="flex h-full min-h-[320px] items-center justify-center">
-            <div className="max-w-md rounded-3xl border border-rose-200 bg-rose-50 px-5 py-4 text-center text-sm text-rose-700 shadow-sm">
-              <div className="font-medium">预览失败</div>
-              <div className="mt-1 text-xs text-rose-600">{error}</div>
-            </div>
-          </div>
-        )}
-
-        {!loading && !error && preview && (
-          <div className="flex min-h-full items-start justify-center">
-            <div className="relative inline-block overflow-hidden rounded-[30px] bg-white p-2 shadow-[0_30px_90px_rgba(15,23,42,0.16)]">
-              <img
-                src={imageSrc ?? preview.imageUrl}
-                alt="PDF preview"
-                className="block max-h-[84vh] max-w-full rounded-[24px]"
-                onError={() => {
-                  setImageSrc(null);
-                }}
-              />
-
-              <div className="pointer-events-none absolute inset-2">
-                {showGuides ? (
-                  <svg className="absolute inset-0 h-full w-full overflow-visible">
-                    {overlays.map((overlay, index) => (
-                      <ConnectorOverlay key={`${overlay.taskName}-connector-${index}`} overlay={overlay} />
-                    ))}
-                  </svg>
-                ) : null}
-
-                {overlays.map((overlay, index) => {
-                  return (
-                    <ImageOverlay
-                      key={`${overlay.taskName}-${index}`}
-                      overlay={overlay}
-                      src={overlay.imageUrl}
-                      showGuides={showGuides}
-                    />
-                  );
-                })}
-              </div>
-
-              <div className="pointer-events-none absolute right-5 top-5 flex max-w-[280px] flex-wrap items-center justify-end gap-2">
-                <FloatChip>{enabledTasks.length} 个启用任务</FloatChip>
-                {selectedTaskId ? <FloatChip strong>当前任务: {selectedTaskId}</FloatChip> : null}
-                {previewUsesRandomOffset ? <FloatChip>随机偏移使用稳定采样</FloatChip> : null}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      <div className="relative min-h-0 flex-1 overflow-auto px-5 py-5">{content}</div>
     </div>
   );
 }
@@ -236,8 +241,10 @@ export function PreviewPanel({
 function ConnectorOverlay({ overlay }: { overlay: PreviewOverlay }) {
   const start = rectCenter(overlay.matchRect);
   const end = rectCenter(overlay.imageRect);
-  const stroke = overlay.selected ? "rgba(239, 68, 68, 0.9)" : "rgba(16, 185, 129, 0.82)";
-  const fill = overlay.selected ? "rgba(239, 68, 68, 0.96)" : "rgba(16, 185, 129, 0.9)";
+  const stroke = overlay.selected
+    ? "color-mix(in srgb, var(--app-destructive) 72%, white)"
+    : "color-mix(in srgb, var(--app-success) 72%, white)";
+  const fill = overlay.selected ? "var(--app-destructive)" : "var(--app-success)";
 
   return (
     <g>
@@ -267,11 +274,11 @@ function ImageOverlay({
   return (
     <div
       className={cn(
-        "absolute overflow-hidden rounded-[14px] shadow-[0_8px_28px_rgba(15,23,42,0.10)]",
+        "absolute overflow-hidden rounded-[12px]",
         showGuides
           ? overlay.selected
-            ? "border-2 border-rose-500/95"
-            : "border border-emerald-500/90"
+            ? "border-2 border-[color:var(--app-destructive)]"
+            : "border border-[color:var(--app-success)]"
           : "border border-transparent"
       )}
       style={{
@@ -279,12 +286,13 @@ function ImageOverlay({
         top: `${overlay.imageRect.y * 100}%`,
         width: `${overlay.imageRect.width * 100}%`,
         height: `${overlay.imageRect.height * 100}%`,
+        boxShadow: "var(--app-shadow-soft)",
       }}
     >
       {src ? (
         <img src={src} alt={overlay.taskName} className="h-full w-full object-fill" />
       ) : (
-        <div className="h-full w-full bg-[linear-gradient(135deg,_rgba(148,163,184,0.18),_rgba(226,232,240,0.55))]" />
+        <div className="h-full w-full bg-muted" />
       )}
     </div>
   );
@@ -300,17 +308,17 @@ function SegmentedControl<T extends string>({
   options: { value: T; label: string }[];
 }) {
   return (
-    <div className="inline-flex items-center rounded-full border border-slate-200 bg-white/85 p-1 shadow-sm">
+    <div className="inline-flex items-center rounded-xl border border-border bg-muted p-1">
       {options.map((option) => (
         <button
           key={option.value}
           type="button"
           onClick={() => onChange(option.value)}
           className={cn(
-            "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+            "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
             option.value === value
-              ? "bg-slate-900 text-white"
-              : "text-slate-500 hover:text-slate-900"
+              ? "bg-background text-foreground shadow-[var(--app-shadow-soft)]"
+              : "text-muted-foreground hover:text-foreground"
           )}
         >
           {option.label}
@@ -320,22 +328,9 @@ function SegmentedControl<T extends string>({
   );
 }
 
-function FloatChip({
-  children,
-  strong = false,
-}: {
-  children: ReactNode;
-  strong?: boolean;
-}) {
+function StatusPill({ children }: { children: ReactNode }) {
   return (
-    <div
-      className={cn(
-        "rounded-full border px-3 py-1.5 text-[11px] shadow-sm backdrop-blur",
-        strong
-          ? "border-rose-200 bg-white/92 font-medium text-rose-800"
-          : "border-white/70 bg-white/78 text-slate-600"
-      )}
-    >
+    <div className="rounded-full border border-border bg-background/80 px-2.5 py-1 text-[11px] text-muted-foreground">
       {children}
     </div>
   );
@@ -356,10 +351,10 @@ function EmptyState({
   description: string;
 }) {
   return (
-    <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(248,250,252,0.82),_rgba(226,232,240,0.48))]">
-      <div className="max-w-md rounded-[28px] border border-white/80 bg-white/80 px-6 py-6 text-center shadow-[0_24px_80px_rgba(148,163,184,0.16)] backdrop-blur">
-        <div className="text-base font-semibold text-slate-900">{title}</div>
-        <div className="mt-2 text-sm leading-6 text-slate-500">{description}</div>
+    <div className="flex h-full items-center justify-center px-6">
+      <div className="panel-surface-muted max-w-md rounded-[28px] px-6 py-6 text-center">
+        <div className="text-base font-semibold text-foreground">{title}</div>
+        <div className="mt-2 text-sm leading-6 text-muted-foreground">{description}</div>
       </div>
     </div>
   );
