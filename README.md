@@ -193,5 +193,6 @@ git push origin v1.0.0
 GitHub Actions 会自动：
 
 - 在 `ubuntu-22.04`、`windows-latest`、`macos-latest` 上构建安装包
-- 创建或更新同名 GitHub Release
+- 创建或更新同名 GitHub Release（草稿）
+- 由 GitHub 自动生成 Release Notes
 - 将各平台安装包作为 Release assets 挂载到该 Release 下

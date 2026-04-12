@@ -142,7 +142,8 @@ jobs:
           tauriScript: pnpm tauri
           tagName: ${{ github.ref_name }}
           releaseName: PDF Image Inserter ${{ github.ref_name }}
-          releaseBody: See the assets to download and install this version.
+          releaseDraft: true
+          generateReleaseNotes: true
 
       - name: Build Tauri bundle
         if: github.event_name == 'workflow_dispatch'
