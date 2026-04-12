@@ -14,6 +14,7 @@ interface TaskListProps {
   onDelete: (taskId: string) => void;
   onToggle: (taskId: string) => void;
   onReorder: (sourceTaskId: string, targetIndex: number) => void;
+  disabled?: boolean;
 }
 
 export function TaskList({
@@ -24,6 +25,7 @@ export function TaskList({
   onDelete,
   onToggle,
   onReorder,
+  disabled = false,
 }: TaskListProps) {
   const { t } = useTranslation();
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
@@ -41,7 +43,7 @@ export function TaskList({
   }
 
   const handleDrop = (sourceTaskId: string, nextDropIndex: number | null) => {
-    if (nextDropIndex === null) {
+    if (disabled || nextDropIndex === null) {
       return;
     }
 
@@ -55,6 +57,10 @@ export function TaskList({
           <div
             key={task.name}
             onDragOver={(event) => {
+              if (disabled) {
+                return;
+              }
+
               event.preventDefault();
               const bounds = event.currentTarget.getBoundingClientRect();
               const nextIndex =
@@ -62,6 +68,10 @@ export function TaskList({
               setDropIndex(nextIndex);
             }}
             onDrop={(event) => {
+              if (disabled) {
+                return;
+              }
+
               event.preventDefault();
               const sourceTaskId = event.dataTransfer.getData("text/plain");
               handleDrop(sourceTaskId, dropIndex);
@@ -71,9 +81,18 @@ export function TaskList({
           >
             {draggingTaskId && dropIndex === index ? <DropPlaceholder /> : null}
             <div
-              draggable
-              onClick={() => onSelect(task.name)}
+              draggable={!disabled}
+              onClick={() => {
+                if (!disabled) {
+                  onSelect(task.name);
+                }
+              }}
               onDragStart={(event) => {
+                if (disabled) {
+                  event.preventDefault();
+                  return;
+                }
+
                 event.dataTransfer.effectAllowed = "move";
                 event.dataTransfer.setData("text/plain", task.name);
                 setDraggingTaskId(task.name);
@@ -88,7 +107,8 @@ export function TaskList({
                 selectedTaskId === task.name &&
                   "border-[color:var(--app-border-strong)] bg-[var(--app-surface-strong)] shadow-[var(--app-shadow-soft)]",
                 draggingTaskId === task.name && "opacity-55",
-                !task.enabled && "opacity-65"
+                !task.enabled && "opacity-65",
+                disabled && "cursor-wait"
               )}
             >
               <div className="min-w-0 flex-1">
@@ -134,6 +154,7 @@ export function TaskList({
               <div className="flex w-10 shrink-0 flex-col items-center justify-between gap-1">
                 <Switch
                   checked={task.enabled}
+                  disabled={disabled}
                   onClick={(event) => {
                     event.stopPropagation();
                   }}
@@ -145,6 +166,7 @@ export function TaskList({
                   className="h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground"
                   aria-label={t("tasks.list.edit", { taskName: task.name })}
                   title={t("tasks.list.edit", { taskName: task.name })}
+                  disabled={disabled}
                   onClick={(event) => {
                     event.stopPropagation();
                     onEdit(task);
@@ -158,6 +180,7 @@ export function TaskList({
                   className="h-8 w-8 rounded-xl text-destructive hover:text-destructive"
                   aria-label={t("tasks.list.delete", { taskName: task.name })}
                   title={t("tasks.list.delete", { taskName: task.name })}
+                  disabled={disabled}
                   onClick={(event) => {
                     event.stopPropagation();
                     onDelete(task.name);
@@ -174,10 +197,18 @@ export function TaskList({
         <div
           className="h-4"
           onDragOver={(event) => {
+            if (disabled) {
+              return;
+            }
+
             event.preventDefault();
             setDropIndex(tasks.length);
           }}
           onDrop={(event) => {
+            if (disabled) {
+              return;
+            }
+
             event.preventDefault();
             const sourceTaskId = event.dataTransfer.getData("text/plain");
             handleDrop(sourceTaskId, tasks.length);

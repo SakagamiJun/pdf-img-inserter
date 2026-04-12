@@ -12,7 +12,7 @@ interface TaskDialogProps {
   open: boolean;
   task?: TaskConfig;
   existingNames: string[];
-  onSave: (task: TaskConfig) => void;
+  onSave: (task: TaskConfig) => Promise<void> | void;
   onClose: () => void;
 }
 
@@ -36,6 +36,7 @@ export function TaskDialog({
     enabled: true,
   });
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (task) {
@@ -65,6 +66,7 @@ export function TaskDialog({
     }
 
     setError(null);
+    setSaving(false);
   }, [existingNames.length, i18n, open, task]);
 
   const handleSelectImage = async () => {
@@ -80,7 +82,7 @@ export function TaskDialog({
     }
   };
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
     if (!formData.name.trim()) {
@@ -103,7 +105,16 @@ export function TaskDialog({
       return;
     }
 
-    onSave({ ...formData });
+    setSaving(true);
+    setError(null);
+
+    try {
+      await onSave({ ...formData });
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : String(saveError));
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!open) {
@@ -116,7 +127,11 @@ export function TaskDialog({
         type="button"
         aria-label={t("tasks.dialog.ariaClose")}
         className="absolute inset-0 bg-[var(--app-overlay)]"
-        onClick={onClose}
+        onClick={() => {
+          if (!saving) {
+            onClose();
+          }
+        }}
       />
 
       <div className="panel-surface-strong relative z-10 flex h-full w-full max-w-[460px] flex-col border-l">
@@ -137,6 +152,7 @@ export function TaskDialog({
             onClick={onClose}
             className="rounded-xl"
             title={t("common.actions.close")}
+            disabled={saving}
           >
             <X className="h-4 w-4" />
           </Button>
@@ -306,11 +322,21 @@ export function TaskDialog({
           </div>
 
           <div className="flex items-center justify-end gap-2 border-t hairline px-6 py-4">
-            <Button type="button" variant="outline" onClick={onClose} className="rounded-xl">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className="rounded-xl"
+              disabled={saving}
+            >
               {t("common.actions.cancel")}
             </Button>
-            <Button type="submit" className="rounded-xl px-4">
-              {task ? t("common.actions.saveChanges") : t("common.actions.addTask")}
+            <Button type="submit" className="rounded-xl px-4" disabled={saving}>
+              {saving
+                ? t("common.actions.saving")
+                : task
+                  ? t("common.actions.saveChanges")
+                  : t("common.actions.addTask")}
             </Button>
           </div>
         </form>

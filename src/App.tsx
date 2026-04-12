@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ChevronsLeft,
@@ -42,12 +42,7 @@ function App() {
     loadConfig,
     saveConfig,
     initDefaultConfig,
-    updateTask,
-    addTask,
-    removeTask,
-    toggleTask,
-    reorderTasks,
-    setAllTasksEnabled,
+    replaceConfig,
     updateGlobalConfig,
   } = useConfig();
   const { locale, setLocale } = useLocale();
@@ -68,6 +63,8 @@ function App() {
   const [isResizing, setIsResizing] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
   const [hasUnreadErrors, setHasUnreadErrors] = useState(false);
+  const [taskMutationPending, setTaskMutationPending] = useState(false);
+  const taskMutationLockRef = useRef(false);
 
   useAppState(setLogs, setProcessing, setProgress);
 
@@ -117,6 +114,52 @@ function App() {
       throw error;
     }
   }, [addLog, config, configPath, mutationVersion, saveConfig, t]);
+
+  const logConfigSaveError = useCallback(
+    (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      addLog("error", t("app.logs.configSaveFailed", { message }), { target: "config" });
+    },
+    [addLog, t]
+  );
+
+  const saveTaskConfigChange = useCallback(
+    async (buildNextTasks: (currentTasks: TaskConfig[]) => TaskConfig[] | null) => {
+      if (!config || !configPath) {
+        return null;
+      }
+
+      const nextTasks = buildNextTasks(config.tasks);
+      if (!nextTasks) {
+        return null;
+      }
+
+      const nextConfig = {
+        ...config,
+        tasks: nextTasks,
+      };
+
+      await saveConfig(configPath, nextConfig, { mutationVersion });
+
+      return nextConfig;
+    },
+    [config, configPath, mutationVersion, saveConfig]
+  );
+
+  const beginTaskMutation = useCallback(() => {
+    if (taskMutationLockRef.current) {
+      return false;
+    }
+
+    taskMutationLockRef.current = true;
+    setTaskMutationPending(true);
+    return true;
+  }, []);
+
+  const endTaskMutation = useCallback(() => {
+    taskMutationLockRef.current = false;
+    setTaskMutationPending(false);
+  }, []);
 
   const handleProcess = useCallback(async () => {
     if (!config || processing) {
@@ -183,43 +226,222 @@ function App() {
   }, []);
 
   const handleDeleteTask = useCallback(
-    (taskId: string) => {
+    async (taskId: string) => {
       if (!confirm(t("app.dialogs.confirmDeleteTask", { taskId }))) {
         return;
       }
 
-      removeTask(taskId);
-      addLog("info", t("app.logs.taskDeleted", { taskId }));
-      if (selectedTaskId === taskId) {
-        setSelectedTaskId(config?.tasks.find((task) => task.name !== taskId)?.name ?? null);
+      if (!beginTaskMutation()) {
+        return;
+      }
+
+      try {
+        const nextConfig = await saveTaskConfigChange((currentTasks) => {
+          const filteredTasks = currentTasks.filter((task) => task.name !== taskId);
+          return filteredTasks.length === currentTasks.length ? null : filteredTasks;
+        });
+
+        if (!nextConfig) {
+          return;
+        }
+
+        replaceConfig(nextConfig, { markDirty: false });
+        addLog("info", t("app.logs.taskDeleted", { taskId }));
+        if (selectedTaskId === taskId) {
+          setSelectedTaskId(nextConfig.tasks[0]?.name ?? null);
+        }
+      } catch (error) {
+        logConfigSaveError(error);
+      } finally {
+        endTaskMutation();
       }
     },
-    [addLog, config?.tasks, removeTask, selectedTaskId, t]
+    [
+      addLog,
+      beginTaskMutation,
+      endTaskMutation,
+      logConfigSaveError,
+      replaceConfig,
+      saveTaskConfigChange,
+      selectedTaskId,
+      t,
+    ]
   );
 
   const handleSaveTask = useCallback(
-    (task: TaskConfig) => {
-      if (editingTask) {
-        updateTask(editingTask.name, task);
-        addLog("info", t("app.logs.taskUpdated", { taskName: task.name }));
-      } else {
-        addTask(task);
-        addLog("info", t("app.logs.taskAdded", { taskName: task.name }));
+    async (task: TaskConfig) => {
+      if (!beginTaskMutation()) {
+        return;
       }
 
-      setSelectedTaskId(task.name);
-      setTaskDialogOpen(false);
-      setEditingTask(undefined);
-      setActiveSection("tasks");
-      setContextVisible(true);
+      try {
+        const nextConfig = await saveTaskConfigChange((currentTasks) => {
+          if (!editingTask) {
+            return [...currentTasks, task];
+          }
+
+          let didUpdate = false;
+          const updatedTasks = currentTasks.map((currentTask) => {
+            if (currentTask.name !== editingTask.name) {
+              return currentTask;
+            }
+
+            didUpdate = true;
+            return task;
+          });
+
+          return didUpdate ? updatedTasks : null;
+        });
+
+        if (!nextConfig) {
+          return;
+        }
+
+        replaceConfig(nextConfig, { markDirty: false });
+        addLog(
+          "info",
+          editingTask
+            ? t("app.logs.taskUpdated", { taskName: task.name })
+            : t("app.logs.taskAdded", { taskName: task.name })
+        );
+
+        setSelectedTaskId(task.name);
+        setTaskDialogOpen(false);
+        setEditingTask(undefined);
+        setActiveSection("tasks");
+        setContextVisible(true);
+      } catch (error) {
+        logConfigSaveError(error);
+        throw error;
+      } finally {
+        endTaskMutation();
+      }
     },
-    [addLog, addTask, editingTask, t, updateTask]
+    [
+      addLog,
+      beginTaskMutation,
+      editingTask,
+      endTaskMutation,
+      logConfigSaveError,
+      replaceConfig,
+      saveTaskConfigChange,
+      t,
+    ]
   );
 
   const handleAddTask = useCallback(() => {
     setEditingTask(undefined);
     setTaskDialogOpen(true);
   }, []);
+
+  const handleToggleTask = useCallback(
+    async (taskId: string) => {
+      if (!beginTaskMutation()) {
+        return;
+      }
+
+      try {
+        const nextConfig = await saveTaskConfigChange((currentTasks) => {
+          let didToggle = false;
+          const updatedTasks = currentTasks.map((task) => {
+            if (task.name !== taskId) {
+              return task;
+            }
+
+            didToggle = true;
+            return {
+              ...task,
+              enabled: !task.enabled,
+            };
+          });
+
+          return didToggle ? updatedTasks : null;
+        });
+
+        if (!nextConfig) {
+          return;
+        }
+
+        replaceConfig(nextConfig, { markDirty: false });
+      } catch (error) {
+        logConfigSaveError(error);
+      } finally {
+        endTaskMutation();
+      }
+    },
+    [beginTaskMutation, endTaskMutation, logConfigSaveError, replaceConfig, saveTaskConfigChange]
+  );
+
+  const handleReorderTasks = useCallback(
+    async (sourceTaskId: string, targetIndex: number) => {
+      if (!beginTaskMutation()) {
+        return;
+      }
+
+      try {
+        const nextConfig = await saveTaskConfigChange((currentTasks) => {
+          const sourceIndex = currentTasks.findIndex((task) => task.name === sourceTaskId);
+
+          if (sourceIndex === -1) {
+            return null;
+          }
+
+          const reorderedTasks = [...currentTasks];
+          const [movedTask] = reorderedTasks.splice(sourceIndex, 1);
+          const clampedIndex = Math.max(0, Math.min(targetIndex, reorderedTasks.length));
+          const insertionIndex = sourceIndex < clampedIndex ? clampedIndex - 1 : clampedIndex;
+
+          if (insertionIndex === sourceIndex) {
+            return null;
+          }
+
+          reorderedTasks.splice(insertionIndex, 0, movedTask);
+          return reorderedTasks;
+        });
+
+        if (!nextConfig) {
+          return;
+        }
+
+        replaceConfig(nextConfig, { markDirty: false });
+      } catch (error) {
+        logConfigSaveError(error);
+      } finally {
+        endTaskMutation();
+      }
+    },
+    [beginTaskMutation, endTaskMutation, logConfigSaveError, replaceConfig, saveTaskConfigChange]
+  );
+
+  const handleSetAllTasksEnabled = useCallback(
+    async (enabled: boolean) => {
+      if (!beginTaskMutation()) {
+        return;
+      }
+
+      try {
+        const nextConfig = await saveTaskConfigChange((currentTasks) => {
+          const hasChanges = currentTasks.some((task) => task.enabled !== enabled);
+          if (!hasChanges) {
+            return null;
+          }
+
+          return currentTasks.map((task) => ({ ...task, enabled }));
+        });
+
+        if (!nextConfig) {
+          return;
+        }
+
+        replaceConfig(nextConfig, { markDirty: false });
+      } catch (error) {
+        logConfigSaveError(error);
+      } finally {
+        endTaskMutation();
+      }
+    },
+    [beginTaskMutation, endTaskMutation, logConfigSaveError, replaceConfig, saveTaskConfigChange]
+  );
 
   const handleSectionChange = useCallback(
     (section: WorkspaceSection) => {
@@ -364,13 +586,14 @@ function App() {
                 logs={logs}
                 selectedTaskId={selectedTaskId}
                 enabledTaskCount={enabledTaskCount}
+                taskActionsDisabled={taskMutationPending}
                 onAddTask={handleAddTask}
                 onSelectTask={setSelectedTaskId}
                 onEditTask={handleEditTask}
                 onDeleteTask={handleDeleteTask}
-                onToggleTask={toggleTask}
-                onReorderTasks={reorderTasks}
-                onSetAllTasksEnabled={setAllTasksEnabled}
+                onToggleTask={handleToggleTask}
+                onReorderTasks={handleReorderTasks}
+                onSetAllTasksEnabled={handleSetAllTasksEnabled}
                 onConfigPathChange={handleLoadConfig}
                 onInputFolderChange={(path) => updateGlobalConfig({ inputFolder: path })}
                 onOutputFolderChange={(path) => updateGlobalConfig({ outputFolder: path })}
@@ -441,13 +664,14 @@ function App() {
                 logs={logs}
                 selectedTaskId={selectedTaskId}
                 enabledTaskCount={enabledTaskCount}
+                taskActionsDisabled={taskMutationPending}
                 onAddTask={handleAddTask}
                 onSelectTask={setSelectedTaskId}
                 onEditTask={handleEditTask}
                 onDeleteTask={handleDeleteTask}
-                onToggleTask={toggleTask}
-                onReorderTasks={reorderTasks}
-                onSetAllTasksEnabled={setAllTasksEnabled}
+                onToggleTask={handleToggleTask}
+                onReorderTasks={handleReorderTasks}
+                onSetAllTasksEnabled={handleSetAllTasksEnabled}
                 onConfigPathChange={handleLoadConfig}
                 onInputFolderChange={(path) => updateGlobalConfig({ inputFolder: path })}
                 onOutputFolderChange={(path) => updateGlobalConfig({ outputFolder: path })}
@@ -481,6 +705,7 @@ interface WorkspacePanelProps {
   logs: LogEntry[];
   selectedTaskId: string | null;
   enabledTaskCount: number;
+  taskActionsDisabled: boolean;
   onAddTask: () => void;
   onSelectTask: (taskId: string) => void;
   onEditTask: (task: TaskConfig) => void;
@@ -503,6 +728,7 @@ function WorkspacePanel({
   logs,
   selectedTaskId,
   enabledTaskCount,
+  taskActionsDisabled,
   onAddTask,
   onSelectTask,
   onEditTask,
@@ -534,7 +760,12 @@ function WorkspacePanel({
                 })}
               </p>
             </div>
-            <Button size="sm" onClick={onAddTask} className="h-9 rounded-xl px-3">
+            <Button
+              size="sm"
+              onClick={onAddTask}
+              className="h-9 rounded-xl px-3"
+              disabled={taskActionsDisabled}
+            >
               <Plus className="mr-1.5 h-4 w-4" />
               {t("common.actions.new")}
             </Button>
@@ -544,7 +775,7 @@ function WorkspacePanel({
               size="sm"
               variant="outline"
               onClick={() => onSetAllTasksEnabled(true)}
-              disabled={!config || config.tasks.length === 0}
+              disabled={taskActionsDisabled || !config || config.tasks.length === 0}
               className="rounded-xl"
             >
               {t("common.actions.enableAll")}
@@ -553,7 +784,7 @@ function WorkspacePanel({
               size="sm"
               variant="outline"
               onClick={() => onSetAllTasksEnabled(false)}
-              disabled={!config || config.tasks.length === 0}
+              disabled={taskActionsDisabled || !config || config.tasks.length === 0}
               className="rounded-xl"
             >
               {t("common.actions.disableAll")}
@@ -570,6 +801,7 @@ function WorkspacePanel({
             onDelete={onDeleteTask}
             onToggle={onToggleTask}
             onReorder={onReorderTasks}
+            disabled={taskActionsDisabled}
           />
         </div>
       </div>
