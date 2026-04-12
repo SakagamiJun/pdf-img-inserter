@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -24,15 +25,16 @@ export function TaskList({
   onToggle,
   onReorder,
 }: TaskListProps) {
+  const { t } = useTranslation();
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
 
   if (tasks.length === 0) {
     return (
       <div className="panel-surface-muted flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-dashed px-6 text-center">
-        <p className="text-sm font-medium text-foreground">还没有任务</p>
+        <p className="text-sm font-medium text-foreground">{t("tasks.empty.title")}</p>
         <p className="mt-2 max-w-xs text-sm text-muted-foreground">
-          添加任务后，这里会变成高密度任务队列。预览区会立即使用启用任务进行叠加。
+          {t("tasks.empty.description")}
         </p>
       </div>
     );
@@ -97,21 +99,35 @@ export function TaskList({
                   <span className="truncate text-sm font-medium text-foreground">{task.name}</span>
                   {!task.enabled ? (
                     <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-                      已停用
+                      {t("tasks.list.disabled")}
                     </span>
                   ) : null}
                 </div>
 
                 <div className="mt-2 text-xs leading-5 text-muted-foreground break-all">
-                  <span className="mr-2 text-[11px] uppercase tracking-[0.14em]">Search</span>
+                  <span className="mr-2 text-[11px] uppercase tracking-[0.14em]">
+                    {t("tasks.list.searchLabel")}
+                  </span>
                   {task.searchText}
                 </div>
 
                 <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
-                  <TaskMetaChip label="高度" value={`${task.targetHeightPoints}pt`} />
-                  <TaskMetaChip label="基础偏移" value={`${task.baseOffsetX} / ${task.baseOffsetY}`} />
-                  <TaskMetaChip label="随机偏移 X" value={`±${task.randomOffsetX}`} />
-                  <TaskMetaChip label="随机偏移 Y" value={`±${task.randomOffsetY}`} />
+                  <TaskMetaChip
+                    label={t("tasks.meta.height")}
+                    value={`${task.targetHeightPoints}pt`}
+                  />
+                  <TaskMetaChip
+                    label={t("tasks.meta.baseOffset")}
+                    value={`${task.baseOffsetX} / ${task.baseOffsetY}`}
+                  />
+                  <TaskMetaChip
+                    label={t("tasks.meta.randomOffsetX")}
+                    value={`±${task.randomOffsetX}`}
+                  />
+                  <TaskMetaChip
+                    label={t("tasks.meta.randomOffsetY")}
+                    value={`±${task.randomOffsetY}`}
+                  />
                 </div>
               </div>
 
@@ -127,6 +143,8 @@ export function TaskList({
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground"
+                  aria-label={t("tasks.list.edit", { taskName: task.name })}
+                  title={t("tasks.list.edit", { taskName: task.name })}
                   onClick={(event) => {
                     event.stopPropagation();
                     onEdit(task);
@@ -138,6 +156,8 @@ export function TaskList({
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 rounded-xl text-destructive hover:text-destructive"
+                  aria-label={t("tasks.list.delete", { taskName: task.name })}
+                  title={t("tasks.list.delete", { taskName: task.name })}
                   onClick={(event) => {
                     event.stopPropagation();
                     onDelete(task.name);

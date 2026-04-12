@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { ImagePlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,7 @@ export function TaskDialog({
   onSave,
   onClose,
 }: TaskDialogProps) {
+  const { t, i18n } = useTranslation();
   const [formData, setFormData] = useState<Omit<TaskConfig, "id">>({
     name: "",
     searchText: "",
@@ -50,7 +52,7 @@ export function TaskDialog({
       });
     } else {
       setFormData({
-        name: `任务 ${existingNames.length + 1}`,
+        name: i18n.t("tasks.dialog.defaultName", { index: existingNames.length + 1 }),
         searchText: "",
         imagePath: "",
         baseOffsetX: 0,
@@ -63,11 +65,14 @@ export function TaskDialog({
     }
 
     setError(null);
-  }, [existingNames.length, open, task]);
+  }, [existingNames.length, i18n, open, task]);
 
   const handleSelectImage = async () => {
-    const path = await openFile("选择图片文件", [
-      { name: "图片", extensions: ["png", "jpg", "jpeg", "bmp", "gif", "tiff"] },
+    const path = await openFile(t("tasks.dialog.filePicker.selectImage"), [
+      {
+        name: t("common.files.image"),
+        extensions: ["png", "jpg", "jpeg", "bmp", "gif", "tiff"],
+      },
     ]);
 
     if (path) {
@@ -79,22 +84,22 @@ export function TaskDialog({
     event.preventDefault();
 
     if (!formData.name.trim()) {
-      setError("任务名称不能为空");
+      setError(t("tasks.dialog.validation.nameRequired"));
       return;
     }
 
     if (!task && existingNames.includes(formData.name)) {
-      setError("任务名称已存在");
+      setError(t("tasks.dialog.validation.nameDuplicate"));
       return;
     }
 
     if (!formData.searchText.trim()) {
-      setError("搜索文本不能为空");
+      setError(t("tasks.dialog.validation.searchTextRequired"));
       return;
     }
 
     if (!formData.imagePath.trim()) {
-      setError("图片路径不能为空");
+      setError(t("tasks.dialog.validation.imagePathRequired"));
       return;
     }
 
@@ -109,7 +114,7 @@ export function TaskDialog({
     <div className="fixed inset-0 z-50 flex justify-end">
       <button
         type="button"
-        aria-label="关闭任务编辑器"
+        aria-label={t("tasks.dialog.ariaClose")}
         className="absolute inset-0 bg-[var(--app-overlay)]"
         onClick={onClose}
       />
@@ -118,13 +123,21 @@ export function TaskDialog({
         <div className="flex items-start justify-between gap-3 border-b hairline px-6 py-5">
           <div>
             <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-              {task ? "Edit Task" : "New Task"}
+              {task ? t("tasks.dialog.panelLabel.edit") : t("tasks.dialog.panelLabel.new")}
             </div>
             <h2 className="mt-2 text-lg font-semibold text-foreground">
-              {task ? `编辑 ${task.name}` : "添加新任务"}
+              {task
+                ? t("tasks.dialog.title.edit", { taskName: task.name })
+                : t("tasks.dialog.title.new")}
             </h2>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} className="rounded-xl">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="rounded-xl"
+            title={t("common.actions.close")}
+          >
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -138,7 +151,7 @@ export function TaskDialog({
                 </div>
               ) : null}
 
-              <Field label="任务名称">
+              <Field label={t("tasks.dialog.fields.name")}>
                 <Input
                   value={formData.name}
                   onChange={(event) =>
@@ -149,18 +162,18 @@ export function TaskDialog({
                 />
               </Field>
 
-              <Field label="搜索文本">
+              <Field label={t("tasks.dialog.fields.searchText")}>
                 <Input
                   value={formData.searchText}
                   onChange={(event) =>
                     setFormData((prev) => ({ ...prev, searchText: event.target.value }))
                   }
                   className="h-10 rounded-xl"
-                  placeholder="在 PDF 中搜索此文本"
+                  placeholder={t("tasks.dialog.placeholders.searchText")}
                 />
               </Field>
 
-              <Field label="图片路径">
+              <Field label={t("tasks.dialog.fields.imagePath")}>
                 <div className="flex gap-2">
                   <Input
                     value={formData.imagePath}
@@ -168,7 +181,7 @@ export function TaskDialog({
                       setFormData((prev) => ({ ...prev, imagePath: event.target.value }))
                     }
                     className="h-10 flex-1 rounded-xl"
-                    placeholder="选择或输入图片路径"
+                    placeholder={t("tasks.dialog.placeholders.imagePath")}
                     readOnly
                   />
                   <Button
@@ -179,19 +192,21 @@ export function TaskDialog({
                     className="h-10 rounded-xl px-3"
                   >
                     <ImagePlus className="h-4 w-4" />
-                    <span className="ml-1.5">选择</span>
+                    <span className="ml-1.5">{t("common.actions.select")}</span>
                   </Button>
                 </div>
               </Field>
 
               <div className="panel-surface-muted rounded-2xl p-4">
-                <div className="text-sm font-medium text-foreground">位置控制</div>
+                <div className="text-sm font-medium text-foreground">
+                  {t("tasks.dialog.sections.position.title")}
+                </div>
                 <div className="mt-1 text-sm text-muted-foreground">
-                  基础偏移会稳定应用，随机偏移用于弱化机械感。
+                  {t("tasks.dialog.sections.position.description")}
                 </div>
 
                 <div className="mt-4 grid grid-cols-2 gap-3">
-                  <Field label="基础偏移 X">
+                  <Field label={t("tasks.dialog.fields.baseOffsetX")}>
                     <Input
                       type="number"
                       value={formData.baseOffsetX}
@@ -204,7 +219,7 @@ export function TaskDialog({
                       className="h-10 rounded-xl"
                     />
                   </Field>
-                  <Field label="基础偏移 Y">
+                  <Field label={t("tasks.dialog.fields.baseOffsetY")}>
                     <Input
                       type="number"
                       value={formData.baseOffsetY}
@@ -217,7 +232,7 @@ export function TaskDialog({
                       className="h-10 rounded-xl"
                     />
                   </Field>
-                  <Field label="随机偏移 X (±)">
+                  <Field label={t("tasks.dialog.fields.randomOffsetX")}>
                     <Input
                       type="number"
                       min="0"
@@ -231,7 +246,7 @@ export function TaskDialog({
                       className="h-10 rounded-xl"
                     />
                   </Field>
-                  <Field label="随机偏移 Y (±)">
+                  <Field label={t("tasks.dialog.fields.randomOffsetY")}>
                     <Input
                       type="number"
                       min="0"
@@ -249,7 +264,7 @@ export function TaskDialog({
               </div>
 
               <div className="panel-surface-muted rounded-2xl p-4">
-                <Field label="目标高度 (points)">
+                <Field label={t("tasks.dialog.fields.targetHeight")}>
                   <Input
                     type="number"
                     min="0"
@@ -267,15 +282,17 @@ export function TaskDialog({
                   />
                 </Field>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  设为 0 时，沿用图片原始高度。
+                  {t("tasks.dialog.sections.targetHeight.description")}
                 </p>
               </div>
 
               <div className="panel-surface-muted flex items-center justify-between rounded-2xl p-4">
                 <div>
-                  <div className="text-sm font-medium text-foreground">启用任务</div>
+                  <div className="text-sm font-medium text-foreground">
+                    {t("tasks.dialog.sections.enabled.title")}
+                  </div>
                   <div className="mt-1 text-sm text-muted-foreground">
-                    关闭后会保留配置，但不会参与预览和批处理。
+                    {t("tasks.dialog.sections.enabled.description")}
                   </div>
                 </div>
                 <Switch
@@ -290,10 +307,10 @@ export function TaskDialog({
 
           <div className="flex items-center justify-end gap-2 border-t hairline px-6 py-4">
             <Button type="button" variant="outline" onClick={onClose} className="rounded-xl">
-              取消
+              {t("common.actions.cancel")}
             </Button>
             <Button type="submit" className="rounded-xl px-4">
-              {task ? "保存更改" : "添加任务"}
+              {task ? t("common.actions.saveChanges") : t("common.actions.addTask")}
             </Button>
           </div>
         </form>

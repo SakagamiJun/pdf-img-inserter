@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { FileText, FolderOpen, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,13 +27,14 @@ export function ConfigPanel({
   onOutputFolderChange,
   onSave,
 }: ConfigPanelProps) {
+  const { t } = useTranslation();
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const handleSelectConfig = async () => {
-    const path = await openFile("选择配置文件", [
-      { name: "TOML", extensions: ["toml"] },
-      { name: "所有文件", extensions: ["*"] },
+    const path = await openFile(t("config.filePicker.selectConfig"), [
+      { name: t("common.files.toml"), extensions: ["toml"] },
+      { name: t("common.files.allFiles"), extensions: ["*"] },
     ]);
 
     if (path) {
@@ -41,14 +43,14 @@ export function ConfigPanel({
   };
 
   const handleSelectInputFolder = async () => {
-    const path = await openFolder("选择输入文件夹");
+    const path = await openFolder(t("config.filePicker.selectInputFolder"));
     if (path) {
       onInputFolderChange(path);
     }
   };
 
   const handleSelectOutputFolder = async () => {
-    const path = await openFolder("选择输出文件夹");
+    const path = await openFolder(t("config.filePicker.selectOutputFolder"));
     if (path) {
       onOutputFolderChange(path);
     }
@@ -70,40 +72,40 @@ export function ConfigPanel({
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center justify-between gap-3 border-b hairline pb-4">
         <div className="min-w-0">
-          <div className="text-xs font-medium text-foreground">路径与配置</div>
+          <div className="text-xs font-medium text-foreground">{t("config.title")}</div>
         </div>
         <div className="inline-flex h-9 min-w-[112px] shrink-0 items-center justify-center whitespace-nowrap rounded-xl border border-transparent bg-primary px-3 text-xs font-medium text-primary-foreground shadow-[var(--app-shadow-soft)]">
-          {dirty ? "未保存更改" : "已同步"}
+          {dirty ? t("config.status.dirty") : t("config.status.synced")}
         </div>
       </div>
 
       <div className="mt-4 flex min-h-0 flex-1 flex-col gap-3">
         <Field
-          label="配置文件"
+          label={t("config.fields.configFile.label")}
           value={configPath}
-          placeholder="config.toml"
-          description="切换当前工作配置。新路径会立即加载。"
-          actionLabel="选择"
+          placeholder={t("config.fields.configFile.placeholder")}
+          description={t("config.fields.configFile.description")}
+          actionLabel={t("common.actions.select")}
           icon={<FileText className="h-4 w-4" />}
           onPick={handleSelectConfig}
         />
 
         <Field
-          label="输入目录"
+          label={t("config.fields.inputFolder.label")}
           value={inputFolder}
-          placeholder="./input_pdfs"
-          description="批处理时默认读取的 PDF 来源目录。"
-          actionLabel="浏览"
+          placeholder={t("config.fields.inputFolder.placeholder")}
+          description={t("config.fields.inputFolder.description")}
+          actionLabel={t("common.actions.browse")}
           icon={<FolderOpen className="h-4 w-4" />}
           onPick={handleSelectInputFolder}
         />
 
         <Field
-          label="输出目录"
+          label={t("config.fields.outputFolder.label")}
           value={outputFolder}
-          placeholder="./output_pdfs"
-          description="处理完成后的 PDF 导出目录。"
-          actionLabel="浏览"
+          placeholder={t("config.fields.outputFolder.placeholder")}
+          description={t("config.fields.outputFolder.description")}
+          actionLabel={t("common.actions.browse")}
           icon={<FolderOpen className="h-4 w-4" />}
           onPick={handleSelectOutputFolder}
         />
@@ -115,9 +117,7 @@ export function ConfigPanel({
         ) : null}
 
         <div className="mt-auto flex items-center justify-between gap-3 border-t hairline pt-4">
-          <div className="text-xs text-muted-foreground">
-            更改路径后不会自动写盘，保存后才会更新配置文件。
-          </div>
+          <div className="text-xs text-muted-foreground">{t("config.note")}</div>
           <Button
             size="sm"
             onClick={handleSave}
@@ -125,7 +125,7 @@ export function ConfigPanel({
             className="h-9 rounded-xl px-4"
           >
             <Save className="mr-1.5 h-3.5 w-3.5" />
-            {saving ? "保存中..." : "保存配置"}
+            {saving ? t("common.actions.saving") : t("common.actions.saveConfig")}
           </Button>
         </div>
       </div>

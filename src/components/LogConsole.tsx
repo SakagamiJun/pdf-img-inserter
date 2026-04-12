@@ -1,7 +1,9 @@
 import { Copy, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
+import { useLocale } from "@/hooks/useLocale";
 import type { LogEntry } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +13,8 @@ interface LogConsoleProps {
 }
 
 export function LogConsole({ logs, onClear }: LogConsoleProps) {
+  const { t } = useTranslation();
+  const { locale } = useLocale();
   const [copied, setCopied] = useState(false);
 
   const summary = useMemo(() => {
@@ -30,7 +34,7 @@ export function LogConsole({ logs, onClear }: LogConsoleProps) {
 
     const payload = logs
       .map((log) => {
-        const base = `[${formatTime(log.timestamp)}] ${log.level.toUpperCase()}${
+        const base = `[${formatTime(log.timestamp, locale)}] ${log.level.toUpperCase()}${
           log.target ? ` ${log.target}` : ""
         } ${log.message}`;
 
@@ -53,7 +57,7 @@ export function LogConsole({ logs, onClear }: LogConsoleProps) {
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center justify-between gap-3 border-b hairline pb-4">
         <div className="min-w-0">
-          <div className="text-xs font-medium text-foreground">运行日志</div>
+          <div className="text-xs font-medium text-foreground">{t("logs.title")}</div>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -62,7 +66,7 @@ export function LogConsole({ logs, onClear }: LogConsoleProps) {
             className="h-9 min-w-[88px] rounded-xl px-3 text-xs whitespace-nowrap"
           >
             <Copy className="h-3.5 w-3.5" />
-            {copied ? "已复制" : "复制"}
+            {copied ? t("common.actions.copied") : t("common.actions.copy")}
           </Button>
           {onClear ? (
             <Button
@@ -70,24 +74,24 @@ export function LogConsole({ logs, onClear }: LogConsoleProps) {
               className="h-9 min-w-[88px] rounded-xl px-3 text-xs whitespace-nowrap"
             >
               <Trash2 className="h-3.5 w-3.5" />
-              清空
+              {t("common.actions.clear")}
             </Button>
           ) : null}
         </div>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <LogStat label="信息" value={summary.info} tone="default" />
-        <LogStat label="警告" value={summary.warn} tone="warn" />
-        <LogStat label="错误" value={summary.error} tone="error" />
-        <LogStat label="调试" value={summary.debug + summary.trace} tone="muted" />
+        <LogStat label={t("logs.summary.info")} value={summary.info} tone="default" />
+        <LogStat label={t("logs.summary.warn")} value={summary.warn} tone="warn" />
+        <LogStat label={t("logs.summary.error")} value={summary.error} tone="error" />
+        <LogStat label={t("logs.summary.debug")} value={summary.debug + summary.trace} tone="muted" />
       </div>
 
       <div className="panel-surface-muted mt-4 min-h-0 flex-1 overflow-hidden rounded-2xl">
         <ScrollArea className="h-full">
           {logs.length === 0 ? (
             <div className="flex min-h-[260px] items-center justify-center px-6 text-center text-sm text-muted-foreground">
-              暂无日志。开始预览或批处理后，后端事件会在这里按时间顺序展开。
+              {t("logs.empty")}
             </div>
           ) : (
             <div className="space-y-2 p-3 font-mono text-xs">
@@ -104,9 +108,11 @@ export function LogConsole({ logs, onClear }: LogConsoleProps) {
                       )}
                       style={badgeStyle(log.level)}
                     >
-                      {log.level}
+                      {getLogLevelLabel(t, log.level)}
                     </span>
-                    <span className="text-muted-foreground">{formatTime(log.timestamp)}</span>
+                    <span className="text-muted-foreground">
+                      {formatTime(log.timestamp, locale)}
+                    </span>
                     {log.target ? (
                       <span className="truncate text-muted-foreground">{log.target}</span>
                     ) : null}
@@ -166,12 +172,27 @@ function LogStat({
   );
 }
 
-function formatTime(date: Date) {
-  return date.toLocaleTimeString("zh-CN", {
+function formatTime(date: Date, locale: string) {
+  return date.toLocaleTimeString(locale, {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
   });
+}
+
+function getLogLevelLabel(
+  t: ReturnType<typeof useTranslation>["t"],
+  level: LogEntry["level"]
+) {
+  const keys = {
+    debug: "logs.levels.debug",
+    error: "logs.levels.error",
+    info: "logs.levels.info",
+    trace: "logs.levels.trace",
+    warn: "logs.levels.warn",
+  } as const;
+
+  return t(keys[level]);
 }
 
 function logToneClassName(level: LogEntry["level"]) {
