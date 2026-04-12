@@ -182,3 +182,17 @@ cargo test --manifest-path src-tauri/Cargo.toml
 ```bash
 pnpm tauri build
 ```
+
+如果推送一个符合 `v*` 的 Git 标签，例如：
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+GitHub Actions 会自动：
+
+- 在 `ubuntu-22.04`、`windows-latest`、`macos-latest` 上构建安装包
+- 创建或更新同名 GitHub Release（草稿）
+- 由 GitHub 自动生成 Release Notes
+- 将各平台安装包作为 Release assets 挂载到该 Release 下

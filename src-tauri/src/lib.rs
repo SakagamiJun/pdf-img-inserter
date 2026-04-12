@@ -15,7 +15,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use tauri::{Emitter, Manager};
+use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 use tokio::sync::oneshot;
 use tracing::{error, info, warn};
@@ -709,9 +709,10 @@ async fn process_files(
     tasks: Vec<TaskConfig>,
     preview_file: Option<String>,
     state: tauri::State<'_, Arc<AppState>>,
-    app: tauri::AppHandle,
+    log_bridge: tauri::State<'_, Arc<LogBridge>>,
 ) -> Result<(), String> {
     let state = Arc::clone(state.inner());
+    let log_bridge = Arc::clone(log_bridge.inner());
     let input_path = state
         .ensure_allowed_existing_dir(Path::new(&input_folder), "输入目录")
         .map_err(|error| error.to_string())?;
@@ -745,29 +746,18 @@ async fn process_files(
 
         let total = pdf_files.len();
 
-        let _ = app.emit("progress", ProgressEvent::BatchStarted { total });
+        log_bridge.emit_progress(ProgressEvent::BatchStarted { total });
 
         if total == 0 {
-            let _ = app.emit(
-                "log",
-                logging::LogEvent {
-                    timestamp_ms: SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_millis() as u64,
-                    level: "WARN".to_string(),
-                    target: "batch".to_string(),
-                    message: "没有找到可处理的 PDF 文件。".to_string(),
-                    fields: Default::default(),
-                },
-            );
-            let _ = app.emit(
-                "progress",
-                ProgressEvent::AllCompleted {
-                    success: 0,
-                    failed: 0,
-                },
-            );
+            log_bridge.emit_log(logging::LogEvent::new(
+                "WARN",
+                "batch",
+                "没有找到可处理的 PDF 文件。",
+            ));
+            log_bridge.emit_progress(ProgressEvent::AllCompleted {
+                success: 0,
+                failed: 0,
+            });
             return Ok(());
         }
 
@@ -791,19 +781,11 @@ async fn process_files(
         let pdfium_resource_dir = state.pdfium_resource_dir();
         let (tx, rx) = mpsc::channel::<BatchWorkerEvent>();
 
-        let _ = app.emit(
-            "log",
-            logging::LogEvent {
-                timestamp_ms: SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_millis() as u64,
-                level: "INFO".to_string(),
-                target: "batch".to_string(),
-                message: format!("已启用 {worker_count} 个批处理子进程"),
-                fields: Default::default(),
-            },
-        );
+        log_bridge.emit_log(logging::LogEvent::new(
+            "INFO",
+            "batch",
+            format!("已启用 {worker_count} 个批处理子进程"),
+        ));
 
         std::thread::scope(|scope| {
             for _ in 0..worker_count {
@@ -856,14 +838,11 @@ async fn process_files(
             for event in rx {
                 match event {
                     BatchWorkerEvent::Started { filename, index } => {
-                        let _ = app.emit(
-                            "progress",
-                            ProgressEvent::FileStarted {
-                                filename,
-                                index,
-                                total,
-                            },
-                        );
+                        log_bridge.emit_progress(ProgressEvent::FileStarted {
+                            filename,
+                            index,
+                            total,
+                        });
                     }
                     BatchWorkerEvent::Finished { filename, result } => {
                         let completed = completed_count.fetch_add(1, Ordering::Relaxed) + 1;
@@ -871,28 +850,22 @@ async fn process_files(
                         match result {
                             Ok(processed) => {
                                 success_count.fetch_add(1, Ordering::Relaxed);
-                                let _ = app.emit(
-                                    "progress",
-                                    ProgressEvent::FileCompleted {
-                                        filename,
-                                        insertions: processed.insertions,
-                                        completed,
-                                        total,
-                                    },
-                                );
+                                log_bridge.emit_progress(ProgressEvent::FileCompleted {
+                                    filename,
+                                    insertions: processed.insertions,
+                                    completed,
+                                    total,
+                                });
                             }
                             Err(process_error) => {
                                 failed_count.fetch_add(1, Ordering::Relaxed);
                                 error!(error = %process_error, file = %filename, "PDF 处理失败");
-                                let _ = app.emit(
-                                    "progress",
-                                    ProgressEvent::FileError {
-                                        filename,
-                                        error: process_error,
-                                        completed,
-                                        total,
-                                    },
-                                );
+                                log_bridge.emit_progress(ProgressEvent::FileError {
+                                    filename,
+                                    error: process_error,
+                                    completed,
+                                    total,
+                                });
                             }
                         }
                     }
@@ -900,13 +873,10 @@ async fn process_files(
             }
         });
 
-        let _ = app.emit(
-            "progress",
-            ProgressEvent::AllCompleted {
-                success: success_count.load(Ordering::Relaxed),
-                failed: failed_count.load(Ordering::Relaxed),
-            },
-        );
+        log_bridge.emit_progress(ProgressEvent::AllCompleted {
+            success: success_count.load(Ordering::Relaxed),
+            failed: failed_count.load(Ordering::Relaxed),
+        });
 
         Ok(())
     })
@@ -966,6 +936,21 @@ pub fn run() {
     init_tracing(Arc::clone(&log_bridge));
 
     tauri::Builder::default()
+        .on_window_event({
+            let log_bridge = Arc::clone(&log_bridge);
+            move |window, event| {
+                if window.label() != "main" {
+                    return;
+                }
+
+                if matches!(
+                    event,
+                    tauri::WindowEvent::CloseRequested { .. } | tauri::WindowEvent::Destroyed
+                ) {
+                    log_bridge.begin_shutdown();
+                }
+            }
+        })
         .register_uri_scheme_protocol("preview", {
             let state = Arc::clone(&state);
             move |_context, request| {
@@ -1030,7 +1015,8 @@ pub fn run() {
                 Ok(())
             }
         })
-        .manage(state)
+        .manage(Arc::clone(&state))
+        .manage(Arc::clone(&log_bridge))
         .invoke_handler(tauri::generate_handler![
             pick_file_path,
             pick_folder_path,

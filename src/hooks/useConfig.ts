@@ -7,12 +7,24 @@ import {
   saveConfig as saveConfigCmd,
 } from "@/lib/tauri-commands";
 
+interface MutationOptions {
+  markDirty?: boolean;
+}
+
 export function useConfig() {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [configPath, setConfigPath] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mutationVersion, setMutationVersion] = useState(0);
+
+  const markConfigDirty = useCallback((options?: MutationOptions) => {
+    if (options?.markDirty === false) {
+      return;
+    }
+
+    setMutationVersion((prev) => prev + 1);
+  }, []);
 
   const loadConfigFromFile = useCallback(async (path: string) => {
     setLoading(true);
@@ -86,104 +98,129 @@ export function useConfig() {
     }
   }, []);
 
-  const updateTask = useCallback((taskId: string, updates: Partial<TaskConfig>) => {
-    setConfig((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        tasks: prev.tasks.map((t) =>
-          t.name === taskId ? { ...t, ...updates } : t
-        ),
-      };
-    });
-    setMutationVersion((prev) => prev + 1);
-  }, []);
+  const replaceConfig = useCallback(
+    (nextConfig: AppConfig, options?: MutationOptions) => {
+      setConfig(nextConfig);
+      markConfigDirty(options);
+    },
+    [markConfigDirty]
+  );
 
-  const addTask = useCallback((task: TaskConfig) => {
-    setConfig((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        tasks: [...prev.tasks, task],
-      };
-    });
-    setMutationVersion((prev) => prev + 1);
-  }, []);
+  const updateTask = useCallback(
+    (taskId: string, updates: Partial<TaskConfig>, options?: MutationOptions) => {
+      setConfig((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          tasks: prev.tasks.map((t) => (t.name === taskId ? { ...t, ...updates } : t)),
+        };
+      });
+      markConfigDirty(options);
+    },
+    [markConfigDirty]
+  );
 
-  const removeTask = useCallback((taskId: string) => {
-    setConfig((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        tasks: prev.tasks.filter((t) => t.name !== taskId),
-      };
-    });
-    setMutationVersion((prev) => prev + 1);
-  }, []);
+  const addTask = useCallback(
+    (task: TaskConfig, options?: MutationOptions) => {
+      setConfig((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          tasks: [...prev.tasks, task],
+        };
+      });
+      markConfigDirty(options);
+    },
+    [markConfigDirty]
+  );
 
-  const toggleTask = useCallback((taskId: string) => {
-    setConfig((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        tasks: prev.tasks.map((t) =>
-          t.name === taskId ? { ...t, enabled: !t.enabled } : t
-        ),
-      };
-    });
-    setMutationVersion((prev) => prev + 1);
-  }, []);
+  const removeTask = useCallback(
+    (taskId: string, options?: MutationOptions) => {
+      setConfig((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          tasks: prev.tasks.filter((t) => t.name !== taskId),
+        };
+      });
+      markConfigDirty(options);
+    },
+    [markConfigDirty]
+  );
 
-  const reorderTasks = useCallback((sourceTaskId: string, targetIndex: number) => {
-    setConfig((prev) => {
-      if (!prev) return prev;
+  const toggleTask = useCallback(
+    (taskId: string, options?: MutationOptions) => {
+      setConfig((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          tasks: prev.tasks.map((t) => (t.name === taskId ? { ...t, enabled: !t.enabled } : t)),
+        };
+      });
+      markConfigDirty(options);
+    },
+    [markConfigDirty]
+  );
 
-      const sourceIndex = prev.tasks.findIndex((task) => task.name === sourceTaskId);
+  const reorderTasks = useCallback(
+    (sourceTaskId: string, targetIndex: number, options?: MutationOptions) => {
+      setConfig((prev) => {
+        if (!prev) return prev;
 
-      if (sourceIndex === -1) {
-        return prev;
-      }
+        const sourceIndex = prev.tasks.findIndex((task) => task.name === sourceTaskId);
 
-      const nextTasks = [...prev.tasks];
-      const [moved] = nextTasks.splice(sourceIndex, 1);
-      const clampedIndex = Math.max(0, Math.min(targetIndex, nextTasks.length));
-      const insertionIndex = sourceIndex < clampedIndex ? clampedIndex - 1 : clampedIndex;
+        if (sourceIndex === -1) {
+          return prev;
+        }
 
-      if (insertionIndex === sourceIndex) {
-        return prev;
-      }
+        const nextTasks = [...prev.tasks];
+        const [moved] = nextTasks.splice(sourceIndex, 1);
+        const clampedIndex = Math.max(0, Math.min(targetIndex, nextTasks.length));
+        const insertionIndex = sourceIndex < clampedIndex ? clampedIndex - 1 : clampedIndex;
 
-      nextTasks.splice(insertionIndex, 0, moved);
+        if (insertionIndex === sourceIndex) {
+          return prev;
+        }
 
-      return {
-        ...prev,
-        tasks: nextTasks,
-      };
-    });
-    setMutationVersion((prev) => prev + 1);
-  }, []);
+        nextTasks.splice(insertionIndex, 0, moved);
 
-  const setAllTasksEnabled = useCallback((enabled: boolean) => {
-    setConfig((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        tasks: prev.tasks.map((task) => ({ ...task, enabled })),
-      };
-    });
-    setMutationVersion((prev) => prev + 1);
-  }, []);
+        return {
+          ...prev,
+          tasks: nextTasks,
+        };
+      });
+      markConfigDirty(options);
+    },
+    [markConfigDirty]
+  );
 
-  const updateGlobalConfig = useCallback((updates: Partial<AppConfig["global"]>) => {
-    setConfig((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        global: { ...prev.global, ...updates },
-      };
-    });
-    setMutationVersion((prev) => prev + 1);
-  }, []);
+  const setAllTasksEnabled = useCallback(
+    (enabled: boolean, options?: MutationOptions) => {
+      setConfig((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          tasks: prev.tasks.map((task) => ({ ...task, enabled })),
+        };
+      });
+      markConfigDirty(options);
+    },
+    [markConfigDirty]
+  );
+
+  const updateGlobalConfig = useCallback(
+    (updates: Partial<AppConfig["global"]>, options?: MutationOptions) => {
+      setConfig((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          global: { ...prev.global, ...updates },
+        };
+      });
+      markConfigDirty(options);
+    },
+    [markConfigDirty]
+  );
 
   return {
     config,
@@ -194,6 +231,7 @@ export function useConfig() {
     loadConfig: loadConfigFromFile,
     saveConfig: saveConfigToFile,
     initDefaultConfig,
+    replaceConfig,
     updateTask,
     addTask,
     removeTask,

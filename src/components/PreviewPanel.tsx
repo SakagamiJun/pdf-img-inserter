@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { ChevronLeft, ChevronRight, Layers3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { renderPreview } from "@/lib/tauri-commands";
@@ -30,6 +31,7 @@ export function PreviewPanel({
   toolbarActions,
   onPageChange,
 }: PreviewPanelProps) {
+  const { t } = useTranslation();
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +39,7 @@ export function PreviewPanel({
   const [mode, setMode] = useState<PreviewMode>("all");
 
   const enabledTasks = tasks.filter((task) => task.enabled);
-  const previewFileName = pdfPath?.split(/[\\/]/).pop() ?? "未选择预览文件";
+  const previewFileName = pdfPath?.split(/[\\/]/).pop() ?? t("preview.fallbackFileName");
 
   useEffect(() => {
     if (!preview) {
@@ -105,15 +107,15 @@ export function PreviewPanel({
   if (!pdfPath) {
     content = (
       <EmptyState
-        title="还没有预览 PDF"
-        description="从主工具栏选择一个 PDF 后，右侧会以接近最终输出的方式展示图片叠加效果。"
+        title={t("preview.empty.noPdfTitle")}
+        description={t("preview.empty.noPdfDescription")}
       />
     );
   } else if (enabledTasks.length === 0) {
     content = (
       <EmptyState
-        title="没有启用的任务"
-        description="启用至少一个任务后，这里会直接显示图片叠加效果与落点辅助线。"
+        title={t("preview.empty.noTasksTitle")}
+        description={t("preview.empty.noTasksDescription")}
       />
     );
   } else if (loading) {
@@ -121,7 +123,7 @@ export function PreviewPanel({
       <div className="flex h-full min-h-[340px] items-center justify-center">
         <div className="panel-surface-muted flex items-center gap-3 rounded-full px-4 py-2 text-sm text-muted-foreground">
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-foreground" />
-          后端正在渲染预览...
+          {t("preview.loading")}
         </div>
       </div>
     );
@@ -129,7 +131,7 @@ export function PreviewPanel({
     content = (
       <div className="flex h-full min-h-[340px] items-center justify-center">
         <div className="panel-surface-muted max-w-md rounded-3xl px-5 py-4 text-center">
-          <div className="text-base font-medium text-foreground">预览失败</div>
+          <div className="text-base font-medium text-foreground">{t("preview.failed")}</div>
           <div className="mt-2 text-sm text-muted-foreground">{error}</div>
         </div>
       </div>
@@ -140,7 +142,7 @@ export function PreviewPanel({
         <div className="panel-surface-strong relative inline-block overflow-hidden rounded-[24px] p-3">
           <img
             src={imageSrc ?? preview.imageUrl}
-            alt="PDF preview"
+            alt={t("preview.imageAlt")}
             className="block max-h-[82vh] max-w-full rounded-[18px]"
             onError={() => setImageSrc(null)}
           />
@@ -169,8 +171,8 @@ export function PreviewPanel({
   } else {
     content = (
       <EmptyState
-        title="预览准备中"
-        description="当前状态还没有可显示的切片，请稍后再试。"
+        title={t("preview.empty.preparingTitle")}
+        description={t("preview.empty.preparingDescription")}
       />
     );
   }
@@ -180,20 +182,37 @@ export function PreviewPanel({
       <div className="flex flex-wrap items-start justify-between gap-3 border-b hairline px-5 py-4">
         <div className="min-w-0">
           <div className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
-            Preview Workspace
+            {t("preview.title")}
           </div>
           <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2 text-sm text-foreground">
             <Layers3 className="h-4 w-4 text-muted-foreground" />
             <span className="max-w-[340px] truncate font-medium">{previewFileName}</span>
-            <StatusPill>{enabledTasks.length} 个启用任务</StatusPill>
-            <StatusPill>第 {page + 1} / {Math.max(pageCount, 1)} 页</StatusPill>
+            <StatusPill>
+              {t("preview.status.enabledTasks", { taskCount: enabledTasks.length })}
+            </StatusPill>
+            <StatusPill>
+              {t("preview.status.page", {
+                current: page + 1,
+                total: Math.max(pageCount, 1),
+              })}
+            </StatusPill>
             {progress.total > 0 ? (
               <StatusPill>
-                {processing ? "处理中" : "最近批处理"} {progress.current}/{progress.total}
+                {t("preview.status.batchProgress", {
+                  current: progress.current,
+                  stateLabel: processing
+                    ? t("preview.status.processing")
+                    : t("preview.status.recentBatch"),
+                  total: progress.total,
+                })}
               </StatusPill>
             ) : null}
-            {selectedTaskId ? <StatusPill>当前任务 {selectedTaskId}</StatusPill> : null}
-            {previewUsesRandomOffset ? <StatusPill>含随机偏移</StatusPill> : null}
+            {selectedTaskId ? (
+              <StatusPill>{t("preview.status.currentTask", { taskName: selectedTaskId })}</StatusPill>
+            ) : null}
+            {previewUsesRandomOffset ? (
+              <StatusPill>{t("preview.status.randomOffset")}</StatusPill>
+            ) : null}
           </div>
         </div>
 
@@ -202,9 +221,9 @@ export function PreviewPanel({
             value={mode}
             onChange={setMode}
             options={[
-              { value: "all", label: "全部叠加" },
-              { value: "focused", label: "当前任务" },
-              { value: "effect", label: "纯效果" },
+              { value: "all", label: t("preview.modes.all") },
+              { value: "focused", label: t("preview.modes.focused") },
+              { value: "effect", label: t("preview.modes.effect") },
             ]}
           />
           <div className="flex items-center gap-1">
@@ -215,6 +234,8 @@ export function PreviewPanel({
               onClick={() => onPageChange(Math.max(0, page - 1))}
               disabled={page <= 0 || loading}
               className="h-9 rounded-xl px-3"
+              aria-label={t("preview.navigation.previousPage")}
+              title={t("preview.navigation.previousPage")}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -225,6 +246,8 @@ export function PreviewPanel({
               onClick={() => onPageChange(Math.min(pageCount - 1, page + 1))}
               disabled={pageCount <= 1 || page >= pageCount - 1 || loading}
               className="h-9 rounded-xl px-3"
+              aria-label={t("preview.navigation.nextPage")}
+              title={t("preview.navigation.nextPage")}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ChevronsLeft,
   ChevronsRight,
@@ -19,6 +20,7 @@ import { TaskDialog } from "@/components/TaskDialog";
 import { TaskList } from "@/components/TaskList";
 import { useAppState } from "@/hooks/useAppState";
 import { useConfig } from "@/hooks/useConfig";
+import { useLocale, type SupportedLocale } from "@/hooks/useLocale";
 import { useTheme, type ThemeMode } from "@/hooks/useTheme";
 import { getPageCount, openFile, processFiles } from "@/lib/tauri-commands";
 import type { AppConfig, LogEntry, TaskConfig } from "@/lib/types";
@@ -32,6 +34,7 @@ const RAIL_WIDTH = 72;
 const COMPACT_BREAKPOINT = 1220;
 
 function App() {
+  const { t } = useTranslation();
   const {
     config,
     configPath,
@@ -39,14 +42,10 @@ function App() {
     loadConfig,
     saveConfig,
     initDefaultConfig,
-    updateTask,
-    addTask,
-    removeTask,
-    toggleTask,
-    reorderTasks,
-    setAllTasksEnabled,
+    replaceConfig,
     updateGlobalConfig,
   } = useConfig();
+  const { locale, setLocale } = useLocale();
   const { themeMode, resolvedTheme, setThemeMode } = useTheme();
 
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -64,6 +63,8 @@ function App() {
   const [isResizing, setIsResizing] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
   const [hasUnreadErrors, setHasUnreadErrors] = useState(false);
+  const [taskMutationPending, setTaskMutationPending] = useState(false);
+  const taskMutationLockRef = useRef(false);
 
   useAppState(setLogs, setProcessing, setProgress);
 
@@ -92,11 +93,11 @@ function App() {
     async (path: string) => {
       const loaded = await loadConfig(path);
       if (loaded) {
-        addLog("info", `已加载配置文件: ${path}`);
+        addLog("info", t("app.logs.configLoaded", { path }));
         setSelectedTaskId(loaded.tasks[0]?.name ?? null);
       }
     },
-    [addLog, loadConfig]
+    [addLog, loadConfig, t]
   );
 
   const handleSaveConfig = useCallback(async () => {
@@ -106,13 +107,59 @@ function App() {
 
     try {
       await saveConfig(configPath, config, { mutationVersion });
-      addLog("info", `已保存配置文件: ${configPath}`);
+      addLog("info", t("app.logs.configSaved", { path: configPath }));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      addLog("error", `保存配置失败: ${message}`, { target: "config" });
+      addLog("error", t("app.logs.configSaveFailed", { message }), { target: "config" });
       throw error;
     }
-  }, [addLog, config, configPath, mutationVersion, saveConfig]);
+  }, [addLog, config, configPath, mutationVersion, saveConfig, t]);
+
+  const logConfigSaveError = useCallback(
+    (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      addLog("error", t("app.logs.configSaveFailed", { message }), { target: "config" });
+    },
+    [addLog, t]
+  );
+
+  const saveTaskConfigChange = useCallback(
+    async (buildNextTasks: (currentTasks: TaskConfig[]) => TaskConfig[] | null) => {
+      if (!config || !configPath) {
+        return null;
+      }
+
+      const nextTasks = buildNextTasks(config.tasks);
+      if (!nextTasks) {
+        return null;
+      }
+
+      const nextConfig = {
+        ...config,
+        tasks: nextTasks,
+      };
+
+      await saveConfig(configPath, nextConfig, { mutationVersion });
+
+      return nextConfig;
+    },
+    [config, configPath, mutationVersion, saveConfig]
+  );
+
+  const beginTaskMutation = useCallback(() => {
+    if (taskMutationLockRef.current) {
+      return false;
+    }
+
+    taskMutationLockRef.current = true;
+    setTaskMutationPending(true);
+    return true;
+  }, []);
+
+  const endTaskMutation = useCallback(() => {
+    taskMutationLockRef.current = false;
+    setTaskMutationPending(false);
+  }, []);
 
   const handleProcess = useCallback(async () => {
     if (!config || processing) {
@@ -121,14 +168,16 @@ function App() {
 
     const enabledTasks = config.tasks.filter((task) => task.enabled);
     if (enabledTasks.length === 0) {
-      addLog("warn", "没有启用的任务，已取消处理。");
+      addLog("warn", t("app.logs.noEnabledTasks"));
       return;
     }
 
     setProcessing(true);
     setLogs([]);
     setHasUnreadErrors(false);
-    addLog("info", `开始处理，共 ${enabledTasks.length} 个任务。`, { target: "ui" });
+    addLog("info", t("app.logs.processStarted", { taskCount: enabledTasks.length }), {
+      target: "ui",
+    });
 
     try {
       await processFiles(
@@ -139,13 +188,15 @@ function App() {
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      addLog("error", `处理失败: ${message}`, { target: "ui" });
+      addLog("error", t("app.logs.processFailed", { message }), { target: "ui" });
       setProcessing(false);
     }
-  }, [addLog, config, previewPdf, processing]);
+  }, [addLog, config, previewPdf, processing, t]);
 
   const handleSelectPreviewPdf = useCallback(async () => {
-    const path = await openFile("选择 PDF 文件", [{ name: "PDF", extensions: ["pdf"] }]);
+    const path = await openFile(t("app.filePicker.selectPreviewPdf"), [
+      { name: t("common.files.pdf"), extensions: ["pdf"] },
+    ]);
     if (!path) {
       return;
     }
@@ -158,14 +209,16 @@ function App() {
     try {
       const pageCount = await getPageCount(path);
       setPreviewPageCount(pageCount);
-      addLog("info", `已载入预览文件: ${fileName} (${pageCount} 页)`, { target: "preview" });
+      addLog("info", t("app.logs.previewLoaded", { fileName, pageCount }), {
+        target: "preview",
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      addLog("error", `已选择预览文件 ${fileName}，但读取页数失败: ${message}`, {
+      addLog("error", t("app.logs.previewPageCountFailed", { fileName, message }), {
         target: "preview",
       });
     }
-  }, [addLog]);
+  }, [addLog, t]);
 
   const handleEditTask = useCallback((task: TaskConfig) => {
     setEditingTask(task);
@@ -173,43 +226,222 @@ function App() {
   }, []);
 
   const handleDeleteTask = useCallback(
-    (taskId: string) => {
-      if (!confirm(`确定要删除任务 "${taskId}" 吗？`)) {
+    async (taskId: string) => {
+      if (!confirm(t("app.dialogs.confirmDeleteTask", { taskId }))) {
         return;
       }
 
-      removeTask(taskId);
-      addLog("info", `已删除任务: ${taskId}`);
-      if (selectedTaskId === taskId) {
-        setSelectedTaskId(config?.tasks.find((task) => task.name !== taskId)?.name ?? null);
+      if (!beginTaskMutation()) {
+        return;
+      }
+
+      try {
+        const nextConfig = await saveTaskConfigChange((currentTasks) => {
+          const filteredTasks = currentTasks.filter((task) => task.name !== taskId);
+          return filteredTasks.length === currentTasks.length ? null : filteredTasks;
+        });
+
+        if (!nextConfig) {
+          return;
+        }
+
+        replaceConfig(nextConfig, { markDirty: false });
+        addLog("info", t("app.logs.taskDeleted", { taskId }));
+        if (selectedTaskId === taskId) {
+          setSelectedTaskId(nextConfig.tasks[0]?.name ?? null);
+        }
+      } catch (error) {
+        logConfigSaveError(error);
+      } finally {
+        endTaskMutation();
       }
     },
-    [addLog, config?.tasks, removeTask, selectedTaskId]
+    [
+      addLog,
+      beginTaskMutation,
+      endTaskMutation,
+      logConfigSaveError,
+      replaceConfig,
+      saveTaskConfigChange,
+      selectedTaskId,
+      t,
+    ]
   );
 
   const handleSaveTask = useCallback(
-    (task: TaskConfig) => {
-      if (editingTask) {
-        updateTask(editingTask.name, task);
-        addLog("info", `已更新任务: ${task.name}`);
-      } else {
-        addTask(task);
-        addLog("info", `已添加任务: ${task.name}`);
+    async (task: TaskConfig) => {
+      if (!beginTaskMutation()) {
+        return;
       }
 
-      setSelectedTaskId(task.name);
-      setTaskDialogOpen(false);
-      setEditingTask(undefined);
-      setActiveSection("tasks");
-      setContextVisible(true);
+      try {
+        const nextConfig = await saveTaskConfigChange((currentTasks) => {
+          if (!editingTask) {
+            return [...currentTasks, task];
+          }
+
+          let didUpdate = false;
+          const updatedTasks = currentTasks.map((currentTask) => {
+            if (currentTask.name !== editingTask.name) {
+              return currentTask;
+            }
+
+            didUpdate = true;
+            return task;
+          });
+
+          return didUpdate ? updatedTasks : null;
+        });
+
+        if (!nextConfig) {
+          return;
+        }
+
+        replaceConfig(nextConfig, { markDirty: false });
+        addLog(
+          "info",
+          editingTask
+            ? t("app.logs.taskUpdated", { taskName: task.name })
+            : t("app.logs.taskAdded", { taskName: task.name })
+        );
+
+        setSelectedTaskId(task.name);
+        setTaskDialogOpen(false);
+        setEditingTask(undefined);
+        setActiveSection("tasks");
+        setContextVisible(true);
+      } catch (error) {
+        logConfigSaveError(error);
+        throw error;
+      } finally {
+        endTaskMutation();
+      }
     },
-    [addLog, addTask, editingTask, updateTask]
+    [
+      addLog,
+      beginTaskMutation,
+      editingTask,
+      endTaskMutation,
+      logConfigSaveError,
+      replaceConfig,
+      saveTaskConfigChange,
+      t,
+    ]
   );
 
   const handleAddTask = useCallback(() => {
     setEditingTask(undefined);
     setTaskDialogOpen(true);
   }, []);
+
+  const handleToggleTask = useCallback(
+    async (taskId: string) => {
+      if (!beginTaskMutation()) {
+        return;
+      }
+
+      try {
+        const nextConfig = await saveTaskConfigChange((currentTasks) => {
+          let didToggle = false;
+          const updatedTasks = currentTasks.map((task) => {
+            if (task.name !== taskId) {
+              return task;
+            }
+
+            didToggle = true;
+            return {
+              ...task,
+              enabled: !task.enabled,
+            };
+          });
+
+          return didToggle ? updatedTasks : null;
+        });
+
+        if (!nextConfig) {
+          return;
+        }
+
+        replaceConfig(nextConfig, { markDirty: false });
+      } catch (error) {
+        logConfigSaveError(error);
+      } finally {
+        endTaskMutation();
+      }
+    },
+    [beginTaskMutation, endTaskMutation, logConfigSaveError, replaceConfig, saveTaskConfigChange]
+  );
+
+  const handleReorderTasks = useCallback(
+    async (sourceTaskId: string, targetIndex: number) => {
+      if (!beginTaskMutation()) {
+        return;
+      }
+
+      try {
+        const nextConfig = await saveTaskConfigChange((currentTasks) => {
+          const sourceIndex = currentTasks.findIndex((task) => task.name === sourceTaskId);
+
+          if (sourceIndex === -1) {
+            return null;
+          }
+
+          const reorderedTasks = [...currentTasks];
+          const [movedTask] = reorderedTasks.splice(sourceIndex, 1);
+          const clampedIndex = Math.max(0, Math.min(targetIndex, reorderedTasks.length));
+          const insertionIndex = sourceIndex < clampedIndex ? clampedIndex - 1 : clampedIndex;
+
+          if (insertionIndex === sourceIndex) {
+            return null;
+          }
+
+          reorderedTasks.splice(insertionIndex, 0, movedTask);
+          return reorderedTasks;
+        });
+
+        if (!nextConfig) {
+          return;
+        }
+
+        replaceConfig(nextConfig, { markDirty: false });
+      } catch (error) {
+        logConfigSaveError(error);
+      } finally {
+        endTaskMutation();
+      }
+    },
+    [beginTaskMutation, endTaskMutation, logConfigSaveError, replaceConfig, saveTaskConfigChange]
+  );
+
+  const handleSetAllTasksEnabled = useCallback(
+    async (enabled: boolean) => {
+      if (!beginTaskMutation()) {
+        return;
+      }
+
+      try {
+        const nextConfig = await saveTaskConfigChange((currentTasks) => {
+          const hasChanges = currentTasks.some((task) => task.enabled !== enabled);
+          if (!hasChanges) {
+            return null;
+          }
+
+          return currentTasks.map((task) => ({ ...task, enabled }));
+        });
+
+        if (!nextConfig) {
+          return;
+        }
+
+        replaceConfig(nextConfig, { markDirty: false });
+      } catch (error) {
+        logConfigSaveError(error);
+      } finally {
+        endTaskMutation();
+      }
+    },
+    [beginTaskMutation, endTaskMutation, logConfigSaveError, replaceConfig, saveTaskConfigChange]
+  );
 
   const handleSectionChange = useCallback(
     (section: WorkspaceSection) => {
@@ -297,19 +529,19 @@ function App() {
             </div>
             <div className="space-y-2">
               <RailButton
-                label="任务"
+                label={t("app.rail.tasks")}
                 icon={LayoutList}
                 active={activeSection === "tasks" && contextVisible}
                 onClick={() => handleSectionChange("tasks")}
               />
               <RailButton
-                label="配置"
+                label={t("app.rail.config")}
                 icon={FolderCog}
                 active={activeSection === "config" && contextVisible}
                 onClick={() => handleSectionChange("config")}
               />
               <RailButton
-                label="日志"
+                label={t("app.rail.logs")}
                 icon={FileText}
                 active={activeSection === "logs" && contextVisible}
                 onClick={() => handleSectionChange("logs")}
@@ -324,9 +556,10 @@ function App() {
               resolvedTheme={resolvedTheme}
               onThemeModeChange={setThemeMode}
             />
+            <LanguageSwitcher locale={locale} onLocaleChange={setLocale} />
             <button
               type="button"
-              title={contextVisible ? "隐藏侧栏" : "展开侧栏"}
+              title={contextVisible ? t("app.rail.collapseSidebar") : t("app.rail.expandSidebar")}
               onClick={() => setContextVisible((current) => !current)}
               className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-background/80 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
@@ -353,13 +586,14 @@ function App() {
                 logs={logs}
                 selectedTaskId={selectedTaskId}
                 enabledTaskCount={enabledTaskCount}
+                taskActionsDisabled={taskMutationPending}
                 onAddTask={handleAddTask}
                 onSelectTask={setSelectedTaskId}
                 onEditTask={handleEditTask}
                 onDeleteTask={handleDeleteTask}
-                onToggleTask={toggleTask}
-                onReorderTasks={reorderTasks}
-                onSetAllTasksEnabled={setAllTasksEnabled}
+                onToggleTask={handleToggleTask}
+                onReorderTasks={handleReorderTasks}
+                onSetAllTasksEnabled={handleSetAllTasksEnabled}
                 onConfigPathChange={handleLoadConfig}
                 onInputFolderChange={(path) => updateGlobalConfig({ inputFolder: path })}
                 onOutputFolderChange={(path) => updateGlobalConfig({ outputFolder: path })}
@@ -394,7 +628,9 @@ function App() {
                   className="h-9 rounded-xl px-3"
                 >
                   <FileText className="mr-1.5 h-4 w-4" />
-                  {previewFileName ? "更换预览" : "选择预览"}
+                  {previewFileName
+                    ? t("common.actions.changePreview")
+                    : t("common.actions.selectPreview")}
                 </Button>
                 <Button
                   size="sm"
@@ -403,7 +639,7 @@ function App() {
                   className="h-9 rounded-xl px-3"
                 >
                   <Play className="mr-1.5 h-4 w-4" />
-                  {processing ? "处理中..." : "开始批处理"}
+                  {processing ? t("preview.status.processing") : t("common.actions.startBatch")}
                 </Button>
               </>
             }
@@ -415,7 +651,7 @@ function App() {
           <div className="absolute inset-y-0 left-[72px] z-30 flex w-[min(400px,calc(100%-72px))] max-w-full">
             <button
               type="button"
-              aria-label="关闭工作区面板"
+              aria-label={t("app.rail.closeWorkspacePanel")}
               className="absolute inset-0 left-auto right-[-100vw] w-[100vw] bg-[var(--app-overlay)]"
               onClick={() => setContextVisible(false)}
             />
@@ -428,13 +664,14 @@ function App() {
                 logs={logs}
                 selectedTaskId={selectedTaskId}
                 enabledTaskCount={enabledTaskCount}
+                taskActionsDisabled={taskMutationPending}
                 onAddTask={handleAddTask}
                 onSelectTask={setSelectedTaskId}
                 onEditTask={handleEditTask}
                 onDeleteTask={handleDeleteTask}
-                onToggleTask={toggleTask}
-                onReorderTasks={reorderTasks}
-                onSetAllTasksEnabled={setAllTasksEnabled}
+                onToggleTask={handleToggleTask}
+                onReorderTasks={handleReorderTasks}
+                onSetAllTasksEnabled={handleSetAllTasksEnabled}
                 onConfigPathChange={handleLoadConfig}
                 onInputFolderChange={(path) => updateGlobalConfig({ inputFolder: path })}
                 onOutputFolderChange={(path) => updateGlobalConfig({ outputFolder: path })}
@@ -468,6 +705,7 @@ interface WorkspacePanelProps {
   logs: LogEntry[];
   selectedTaskId: string | null;
   enabledTaskCount: number;
+  taskActionsDisabled: boolean;
   onAddTask: () => void;
   onSelectTask: (taskId: string) => void;
   onEditTask: (task: TaskConfig) => void;
@@ -490,6 +728,7 @@ function WorkspacePanel({
   logs,
   selectedTaskId,
   enabledTaskCount,
+  taskActionsDisabled,
   onAddTask,
   onSelectTask,
   onEditTask,
@@ -503,20 +742,32 @@ function WorkspacePanel({
   onSaveConfig,
   onClearLogs,
 }: WorkspacePanelProps) {
+  const { t } = useTranslation();
+
   if (activeSection === "tasks") {
     return (
       <div className="flex h-full min-h-0 flex-col px-4 py-4">
         <div className="border-b hairline pb-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="text-xs font-medium text-foreground">任务队列</div>
+              <div className="text-xs font-medium text-foreground">
+                {t("app.workspace.tasks.title")}
+              </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                当前共 {config?.tasks.length ?? 0} 个任务，其中 {enabledTaskCount} 个启用。
+                {t("app.workspace.tasks.summary", {
+                  enabledTasks: enabledTaskCount,
+                  totalTasks: config?.tasks.length ?? 0,
+                })}
               </p>
             </div>
-            <Button size="sm" onClick={onAddTask} className="h-9 rounded-xl px-3">
+            <Button
+              size="sm"
+              onClick={onAddTask}
+              className="h-9 rounded-xl px-3"
+              disabled={taskActionsDisabled}
+            >
               <Plus className="mr-1.5 h-4 w-4" />
-              新建
+              {t("common.actions.new")}
             </Button>
           </div>
           <div className="mt-4 flex items-center gap-2">
@@ -524,19 +775,19 @@ function WorkspacePanel({
               size="sm"
               variant="outline"
               onClick={() => onSetAllTasksEnabled(true)}
-              disabled={!config || config.tasks.length === 0}
+              disabled={taskActionsDisabled || !config || config.tasks.length === 0}
               className="rounded-xl"
             >
-              全部启用
+              {t("common.actions.enableAll")}
             </Button>
             <Button
               size="sm"
               variant="outline"
               onClick={() => onSetAllTasksEnabled(false)}
-              disabled={!config || config.tasks.length === 0}
+              disabled={taskActionsDisabled || !config || config.tasks.length === 0}
               className="rounded-xl"
             >
-              全部停用
+              {t("common.actions.disableAll")}
             </Button>
           </div>
         </div>
@@ -550,6 +801,7 @@ function WorkspacePanel({
             onDelete={onDeleteTask}
             onToggle={onToggleTask}
             onReorder={onReorderTasks}
+            disabled={taskActionsDisabled}
           />
         </div>
       </div>
@@ -622,10 +874,11 @@ function ThemeSwitcher({
   resolvedTheme: "light" | "dark";
   onThemeModeChange: (mode: ThemeMode) => void;
 }) {
+  const { t } = useTranslation();
   const options: { mode: ThemeMode; icon: typeof Sun; label: string }[] = [
-    { mode: "light", icon: Sun, label: "浅色" },
-    { mode: "system", icon: Monitor, label: "跟随系统" },
-    { mode: "dark", icon: Moon, label: "深色" },
+    { mode: "light", icon: Sun, label: t("common.theme.light") },
+    { mode: "system", icon: Monitor, label: t("common.theme.system") },
+    { mode: "dark", icon: Moon, label: t("common.theme.dark") },
   ];
 
   return (
@@ -649,7 +902,58 @@ function ThemeSwitcher({
         ))}
       </div>
       <div className="mt-2 border-t hairline pt-2 text-center text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-        {resolvedTheme}
+        {t(`common.theme.resolved.${resolvedTheme}`)}
+      </div>
+    </div>
+  );
+}
+
+function LanguageSwitcher({
+  locale,
+  onLocaleChange,
+}: {
+  locale: SupportedLocale;
+  onLocaleChange: (locale: SupportedLocale) => void;
+}) {
+  const { t } = useTranslation();
+  const options: { locale: SupportedLocale; label: string; title: string }[] = [
+    {
+      locale: "zh-CN",
+      label: t("common.locale.short.zhCn"),
+      title: t("common.locale.names.zhCn"),
+    },
+    {
+      locale: "en-US",
+      label: t("common.locale.short.enUs"),
+      title: t("common.locale.names.enUs"),
+    },
+  ];
+
+  const currentLocaleLabel =
+    locale === "zh-CN" ? t("common.locale.names.zhCn") : t("common.locale.names.enUs");
+
+  return (
+    <div className="rounded-[20px] border border-border bg-background/80 p-1.5">
+      <div className="flex flex-col gap-1">
+        {options.map((option) => (
+          <button
+            key={option.locale}
+            type="button"
+            title={option.title}
+            onClick={() => onLocaleChange(option.locale)}
+            className={cn(
+              "inline-flex h-9 w-9 items-center justify-center rounded-xl text-xs font-semibold transition-colors",
+              locale === option.locale
+                ? "bg-foreground text-background"
+                : "text-muted-foreground hover:bg-accent hover:text-foreground"
+            )}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+      <div className="mt-2 border-t hairline pt-2 text-center text-[10px] tracking-[0.16em] text-muted-foreground">
+        {currentLocaleLabel}
       </div>
     </div>
   );
