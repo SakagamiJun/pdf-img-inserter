@@ -2,8 +2,10 @@
   "name": "pdf-img-inserter",
   "private": true,
   "version": "0.1.0",
+  "packageManager": "pnpm@10.33.0",
   "type": "module",
   "scripts": {
+    "preinstall": "node scripts/enforce-pnpm.cjs",
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
