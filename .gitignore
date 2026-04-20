@@ -34,7 +34,8 @@ src-tauri/gen/
 /src-tauri/config.toml
 /src-tauri/input_pdfs/
 /src-tauri/output_pdfs/
-/src-tauri/vendor/pdfium/
+.pnpm-store/
+.eslintcache
 
 # Editor directories and OS files
 .vscode/*
