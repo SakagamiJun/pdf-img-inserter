@@ -7,10 +7,6 @@ updates:
       day: monday
       time: "09:00"
       timezone: Asia/Tokyo
-    cooldown:
-      semver-patch-days: 7
-      semver-minor-days: 15
-      semver-major-days: 30
     groups:
       non-major:
         patterns:
@@ -31,10 +27,6 @@ updates:
       day: monday
       time: "09:15"
       timezone: Asia/Tokyo
-    cooldown:
-      semver-patch-days: 7
-      semver-minor-days: 15
-      semver-major-days: 30
     groups:
       non-major:
         patterns:
@@ -55,10 +47,6 @@ updates:
       day: monday
       time: "09:30"
       timezone: Asia/Tokyo
-    cooldown:
-      semver-patch-days: 7
-      semver-minor-days: 15
-      semver-major-days: 30
     groups:
       non-major:
         patterns:
