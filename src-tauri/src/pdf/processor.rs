@@ -292,7 +292,7 @@ pub fn search_text_in_page(
     let mut positions = Vec::new();
 
     while let Some(segments) = search.find_next() {
-        for segment in segments.iter() {
+        if let Some(segment) = segments.iter().next() {
             positions.push(TextPosition::from_pdf_rect(segment.bounds(), page_index));
         }
     }

@@ -123,7 +123,7 @@ fn safe_ratio(value: f32, total: f32) -> f32 {
     if total.abs() <= f32::EPSILON {
         0.0
     } else {
-        (value / total).clamp(0.0, 1.0)
+        value / total
     }
 }
 

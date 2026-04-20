@@ -372,47 +372,6 @@ function App() {
     [beginTaskMutation, endTaskMutation, logConfigSaveError, replaceConfig, saveTaskConfigChange]
   );
 
-  const handleReorderTasks = useCallback(
-    async (sourceTaskId: string, targetIndex: number) => {
-      if (!beginTaskMutation()) {
-        return;
-      }
-
-      try {
-        const nextConfig = await saveTaskConfigChange((currentTasks) => {
-          const sourceIndex = currentTasks.findIndex((task) => task.name === sourceTaskId);
-
-          if (sourceIndex === -1) {
-            return null;
-          }
-
-          const reorderedTasks = [...currentTasks];
-          const [movedTask] = reorderedTasks.splice(sourceIndex, 1);
-          const clampedIndex = Math.max(0, Math.min(targetIndex, reorderedTasks.length));
-          const insertionIndex = sourceIndex < clampedIndex ? clampedIndex - 1 : clampedIndex;
-
-          if (insertionIndex === sourceIndex) {
-            return null;
-          }
-
-          reorderedTasks.splice(insertionIndex, 0, movedTask);
-          return reorderedTasks;
-        });
-
-        if (!nextConfig) {
-          return;
-        }
-
-        replaceConfig(nextConfig, { markDirty: false });
-      } catch (error) {
-        logConfigSaveError(error);
-      } finally {
-        endTaskMutation();
-      }
-    },
-    [beginTaskMutation, endTaskMutation, logConfigSaveError, replaceConfig, saveTaskConfigChange]
-  );
-
   const handleSetAllTasksEnabled = useCallback(
     async (enabled: boolean) => {
       if (!beginTaskMutation()) {
@@ -592,7 +551,6 @@ function App() {
                 onEditTask={handleEditTask}
                 onDeleteTask={handleDeleteTask}
                 onToggleTask={handleToggleTask}
-                onReorderTasks={handleReorderTasks}
                 onSetAllTasksEnabled={handleSetAllTasksEnabled}
                 onConfigPathChange={handleLoadConfig}
                 onInputFolderChange={(path) => updateGlobalConfig({ inputFolder: path })}
@@ -670,7 +628,6 @@ function App() {
                 onEditTask={handleEditTask}
                 onDeleteTask={handleDeleteTask}
                 onToggleTask={handleToggleTask}
-                onReorderTasks={handleReorderTasks}
                 onSetAllTasksEnabled={handleSetAllTasksEnabled}
                 onConfigPathChange={handleLoadConfig}
                 onInputFolderChange={(path) => updateGlobalConfig({ inputFolder: path })}
@@ -711,7 +668,6 @@ interface WorkspacePanelProps {
   onEditTask: (task: TaskConfig) => void;
   onDeleteTask: (taskId: string) => void;
   onToggleTask: (taskId: string) => void;
-  onReorderTasks: (sourceTaskId: string, targetIndex: number) => void;
   onSetAllTasksEnabled: (enabled: boolean) => void;
   onConfigPathChange: (path: string) => void;
   onInputFolderChange: (path: string) => void;
@@ -734,7 +690,6 @@ function WorkspacePanel({
   onEditTask,
   onDeleteTask,
   onToggleTask,
-  onReorderTasks,
   onSetAllTasksEnabled,
   onConfigPathChange,
   onInputFolderChange,
@@ -800,7 +755,6 @@ function WorkspacePanel({
             onEdit={onEditTask}
             onDelete={onDeleteTask}
             onToggle={onToggleTask}
-            onReorder={onReorderTasks}
             disabled={taskActionsDisabled}
           />
         </div>
