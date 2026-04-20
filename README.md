@@ -1,198 +1,85 @@
-# PDFImgInserter
+# PDF Image Inserter
 
-基于 `Tauri v2 + Rust + React + Tailwind CSS` 的桌面 PDF 图片批量插入工具。
+这是一个基于 [Tauri](https://tauri.app/) 开发的现代化跨平台桌面应用程序，专门用于批量自动化向 PDF 文件中插入图片。该工具可以根据自定义的任务配置，精准控制图片插入的坐标（支持随机偏移）和尺寸。
 
-核心能力：
-- 在 PDF 中搜索指定文本
-- 根据文本坐标、基础偏移和随机偏移计算图片落点
-- 使用 `pdfium-render` 渲染预览与处理输出
-- 通过 Tauri 命令和事件流进行批处理与实时日志展示
+## 核心特性
 
-## 代码结构
+- **批量处理**：支持对整个文件夹内的多个 PDF 文件进行批量图片插入。
+- **灵活的任务配置**：
+  - 自定义图片插入的基准坐标（`baseOffsetX`, `baseOffsetY`）。
+  - 支持随机偏移范围（`randomOffsetX`, `randomOffsetY`），模拟更自然的插入效果。
+  - 精确控制图片的显示尺寸（`targetHeightPoints`）。
+- **实时预览面板**：通过内置的 UI 实时预览目标 PDF 文件，方便进行坐标调整和校对。
+- **现代化外观**：支持浅色（Light）、深色（Dark）及跟随系统的自动主题切换。
+- **国际化支持**：内置多语言系统（中文 `zh-CN`、英文 `en-US`）。
+- **高性能后端**：由 Rust 编写的底层业务逻辑，集成了 PDFium 用于高强度的 PDF 解析和渲染。
 
-```text
-pdf-img-inserter/
-├── src/                        # React 前端
-│   ├── components/             # 预览、任务列表、配置、日志面板等 UI
-│   ├── hooks/                  # 状态管理与 Tauri 事件订阅
-│   ├── lib/                    # 前端类型与 Tauri 命令封装
-│   └── App.tsx                 # 主工作台布局
-├── src-tauri/
-│   ├── src/
-│   │   ├── config/             # TOML 配置加载、保存、校验
-│   │   ├── coord/              # PDF/Web 坐标换算
-│   │   ├── image/              # 图片预处理、缓存、预览缓存
-│   │   ├── pdf/                # Pdfium 封装、文本搜索、插图与预览
-│   │   ├── logging.rs          # tracing -> 前端日志桥接
-│   │   └── lib.rs              # Tauri 命令、应用初始化、路径策略
-│   ├── resources/pdfium/       # 打包进安装包的 Pdfium 动态库
-│   ├── tests/                  # Rust 集成测试
-│   ├── Cargo.toml
-│   └── tauri.conf.json
-├── public/                     # 静态资源
-└── TESTS.md                    # 测试说明
+## 技术栈与致谢
 
-```
+本项目使用了以下优秀的开源技术，在此表示衷心的感谢，并遵循其相应的开源许可证：
 
-## 运行环境
+- **[Tauri](https://tauri.app/)** (MIT / Apache-2.0): 提供轻量级、安全的跨平台桌面应用运行环境。
+- **[React](https://react.dev/)** (MIT): 用于构建用户界面的 JavaScript 库。
+- **[Vite](https://vitejs.dev/)** (MIT): 下一代前端构建工具。
+- **[TypeScript](https://www.typescriptlang.org/)** (Apache-2.0): 强类型的 JavaScript 超集。
+- **[Tailwind CSS](https://tailwindcss.com/)** (MIT): 实用优先的 CSS 框架。
+- **[Lucide Icons](https://lucide.dev/)** (ISC): 精美的开源图标库。
+- **[PDFium](https://pdfium.googlesource.com/pdfium/)** (BSD 3-Clause / Apache-2.0): 强大的 PDF 渲染引擎。
+- **[Rust](https://www.rust-lang.org/)** (MIT / Apache-2.0): 提供内存安全与高性能的后端逻辑。
+- **[pnpm](https://pnpm.io/)** (MIT): 快速、节省磁盘空间的包管理器。
 
-- Node.js 20+
-- `pnpm`
-- Rust stable
-- Tauri v2 开发环境
-- 可用的 Pdfium 动态库
+特别感谢 **Codex** 和 **Gemini** 在本项目的开发过程中提供的智能协助与代码生成支持。
 
-当前仓库采用 Tauri `bundle.resources` 方案，开发和打包都会优先从：
+## 本地开发环境设置
 
-- `src-tauri/resources/pdfium/`
+### 前置要求
 
-加载 Pdfium。当前 macOS 开发使用的是：
+在开始开发之前，请确保您的系统中已经安装了以下依赖：
+- **Node.js** (推荐 v24 或更高版本)
+- **pnpm** (通过 `npm install -g pnpm` 安装)
+- **Rust Toolchain** (通过 [rustup](https://rustup.rs/) 安装)
+- 各平台所需的 Tauri [系统级依赖](https://tauri.app/v1/guides/getting-started/prerequisites)（如 macOS 需要 Xcode Command Line Tools，Windows 需要 C++ build tools，Linux 需要各类 `libgtk-3-dev` 和 `webkit2gtk` 等相关包）。
 
-- `src-tauri/resources/pdfium/libpdfium.dylib`
+### 安装与运行
 
-如果要在 Windows 或 Linux 上开发/打包：
+1. 克隆项目仓库并进入目录：
+   ```bash
+   git clone <你的仓库地址>
+   cd pdf-img-inserter
+   ```
 
-- `pdfium.dll`
-- `libpdfium.so`
+2. 安装前端依赖（请务必使用 pnpm）：
+   ```bash
+   pnpm install
+   ```
 
-## 如何运行
+3. 启动本地开发服务器（同时启动前端页面和 Tauri 的 Rust 窗口）：
+   ```bash
+   pnpm tauri dev
+   ```
 
-### 1. 安装依赖
+## 项目构建与打包
 
-```bash
-pnpm install
-```
-
-### 2. 启动开发环境
-
-```bash
-pnpm tauri dev
-```
-
-这会同时启动：
-- Vite 前端开发服务器
-- Tauri 桌面壳
-- Rust 后端
-
-## 首次运行与默认配置
-
-应用启动后，前端会先向后端请求默认配置文件路径，并尝试加载该配置；如果配置文件不存在或无法正常加载，就会自动创建一个新的默认配置文件，然后再次加载。
-
-### 默认配置文件位置
-
-默认配置不再放在仓库根目录，而是放在 Tauri 的应用配置目录中：
-
-- 默认配置文件：`<app_config_dir>/config.toml`
-- 默认输入目录：`<document_dir>/PDFImgInserter/input`
-- 默认输出目录：`<document_dir>/PDFImgInserter/exports`
-
-其中 `document_dir` 如果不可用，会依次回退到：
-
-- 下载目录
-- 用户 Home 目录
-
-### 首次运行时会发生什么
-
-如果默认配置文件缺失，应用会自动执行以下动作：
-
-1. 创建应用配置目录、数据目录、缓存目录、日志目录。
-2. 创建默认输入目录和默认输出目录。
-3. 生成默认 `config.toml`。
-4. 重新加载该配置，并作为当前工作配置使用。
-
-如果发现旧版默认配置文件存在，应用会优先尝试迁移旧配置到新的应用配置目录。
-
-如果默认配置文件存在但内容损坏：
-
-- 会先备份为 `config.toml.broken-<timestamp>.bak`
-- 然后重新生成新的默认配置
-
-### 首次生成的默认配置内容
-
-首次自动生成的默认配置是一个“空任务”配置，特点是：
-
-- `global.inputFolder` 指向应用管理的默认输入目录
-- `global.outputFolder` 指向应用管理的默认输出目录
-- `tasks` 初始为空数组
-
-示意如下：
-
-```toml
-[global]
-inputFolder = "/Users/<you>/Documents/PDFImgInserter/input"
-outputFolder = "/Users/<you>/Documents/PDFImgInserter/exports"
-
-tasks = []
-```
-
-实际路径会根据当前操作系统和用户目录变化。
-
-### 配置字段的默认值
-
-除了“首次运行自动生成默认配置文件”之外，配置加载时本身也有字段级默认值。也就是说，如果某个已有配置文件缺少部分字段，反序列化时会按默认值补齐，再做路径解析和校验。
-
-当前主要默认值包括：
-
-- `global.inputFolder`: `./input_pdfs`
-- `global.outputFolder`: `./output_pdfs`
-- `task.baseOffsetX`: `0`
-- `task.baseOffsetY`: `0`
-- `task.randomOffsetX`: `0`
-- `task.randomOffsetY`: `0`
-- `task.targetHeightPoints`: `50.0`
-- `task.enabled`: `true`
-- `tasks`: 空数组
-
-需要注意的是：
-
-- “首次生成的默认配置文件”使用的是应用管理目录下的绝对路径
-- “字段级默认值”主要用于加载不完整配置时的补齐，两者不是同一套逻辑
-
-### 便携配置与默认配置的区别
-
-如果你手动选择一个非应用管理目录下的 `config.toml` 并创建配置，应用会按该文件所在目录生成：
-
-- `input_pdfs/`
-- `output_pdfs/`
-
-这类配置会优先以相对路径保存，便于连同配置文件一起移动；而应用自己的默认配置则使用绝对路径保存。
-
-### 3. 常用检查命令
-
-前端类型检查：
-
-```bash
-pnpm exec tsc --noEmit
-```
-
-Rust 编译检查：
-
-```bash
-cargo check --manifest-path src-tauri/Cargo.toml
-```
-
-Rust 测试：
-
-```bash
-cargo test --manifest-path src-tauri/Cargo.toml
-```
-
-### 4. 打包发布
+要构建适用于您当前操作系统的桌面安装包，请运行以下命令：
 
 ```bash
 pnpm tauri build
 ```
 
-如果推送一个符合 `v*` 的 Git 标签，例如：
+打包完成后，安装程序将被生成在 `src-tauri/target/release/bundle/` 目录下（如 macOS 的 `.dmg`，Windows 的 `.msi` 或 `.exe`，Linux 的 `.deb` / `.AppImage`）。
 
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
+## 项目结构概览
 
-GitHub Actions 会自动：
+详细的项目结构说明请参阅 [ARCHITECTURE.md](ARCHITECTURE.md)。
 
-- 在 `ubuntu-22.04`、`windows-latest`、`macos-latest` 上构建安装包
-- 创建或更新同名 GitHub Release（草稿）
-- 由 GitHub 自动生成 Release Notes
-- 将各平台安装包作为 Release assets 挂载到该 Release 下
+## 贡献指南
+
+1. Fork 本仓库。
+2. 创建您的功能分支 (`git checkout -b feature/AmazingFeature`)。
+3. 提交您的修改 (`git commit -m 'Add some AmazingFeature'`)。
+4. 将分支推送到远程仓库 (`git push origin feature/AmazingFeature`)。
+5. 发起一个 Pull Request。
+
+## 许可证
+
+本项目遵循 [MIT License](LICENSE) 许可证发布。
