@@ -16,7 +16,7 @@
     "@tauri-apps/plugin-dialog": "^2.7.0",
     "@tauri-apps/plugin-opener": "^2.5.3",
     "clsx": "^2.1.1",
-    "i18next": "^26.0.4",
+    "i18next": "^26.0.6",
     "lucide-react": "^1.8.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
