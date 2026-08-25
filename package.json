@@ -16,11 +16,11 @@
     "@tauri-apps/plugin-dialog": "^2.7.2",
     "@tauri-apps/plugin-opener": "^2.5.4",
     "clsx": "^2.1.1",
-    "i18next": "^26.3.6",
-    "lucide-react": "^1.31.0",
+    "i18next": "^26.4.0",
+    "lucide-react": "^1.33.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-i18next": "^17.0.11",
+    "react-i18next": "^17.0.12",
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
@@ -29,9 +29,9 @@
     "@types/node": "^26.2.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
-    "@vitejs/plugin-react": "^6.0.5",
+    "@vitejs/plugin-react": "^6.1.0",
     "tailwindcss": "^4.3.3",
     "typescript": "~7.0.2",
-    "vite": "^8.2.1"
+    "vite": "^8.2.2"
   }
 }
